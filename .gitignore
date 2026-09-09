@@ -1,0 +1,7 @@
+*.txt
+*.pdf
+.env
+__pycache__/
+venv/
+cache/
+*.ipynb
