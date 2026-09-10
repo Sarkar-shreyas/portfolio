@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Any, Literal
 import dotenv
 import os
+from pathlib import Path
 
 
 @dataclass
@@ -9,7 +9,7 @@ class Config:
     # Data params
 
     exchange: str = "SMART"
-    currency: str = "SGD"
+    currency: str = "USD"
     sec_type: str = "STK"
     benchmark: str = "SPX"
 
@@ -29,6 +29,10 @@ class Config:
 
     # Reproducability
     random_seed: int = 42
+
+    # filepath
+    root_dir: Path = Path(os.getenv("ROOT", ""))
+    cache_dir: Path = Path(root_dir / "src/backend/cache")
 
 
 @dataclass
