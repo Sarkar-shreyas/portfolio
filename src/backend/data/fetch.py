@@ -24,10 +24,13 @@ ACCOUNT_SUMMARY_TAGS = (
 def get_equity_data(
     app: IBApp,
     config: DevConfig,
+    conid: int,
     ticker: str = "NVDA",
+    sec_type: str = "STK",
     dur: str = "1 Y",
     reqId: int = 1,
 ) -> pd.DataFrame:
+    app.hd_finished[reqId] = False
     try:
         app.connect(
             host=config.IB_HOST, port=config.IB_PORT, clientId=config.IB_CLIENT_ID
@@ -40,12 +43,25 @@ def get_equity_data(
     thread.start()
     time.sleep(1)
 
-    contract = Contract()
-    contract.symbol = ticker
-    contract.secType = config.sec_type
-    contract.exchange = config.exchange
-    contract.currency = config.currency
+    req_contract = Contract()
+    req_contract.conId = conid
+    con_reqId = reqId + 1000
+    app.contract_details[con_reqId] = None
+    app.cd_finished[con_reqId] = False
+    app.reqContractDetails(con_reqId, req_contract)
 
+    while not app.cd_finished[con_reqId]:
+        time.sleep(0.5)
+
+    contract = app.contract_details[con_reqId].contract
+    print(contract)
+
+    if not contract:
+        print("Error: Could not retrieve contract")
+        app.disconnect()
+        sys.exit(0)
+
+    print(f"{ticker}: {contract}")
     end_time = time.strftime("%Y%m%d %H:%M:%S")
     app.reqHistoricalData(
         reqId=reqId,
@@ -60,12 +76,12 @@ def get_equity_data(
         chartOptions=[],
     )
 
-    while not app.hd_finished:
+    while not app.hd_finished[reqId]:
         time.sleep(0.5)
 
     app.disconnect()
 
-    df = pd.DataFrame(app.data)
+    df = pd.DataFrame(app.data[reqId])
     df["return"] = df["close"].pct_change()
     df = df.dropna(subset=["return"])
     df = df["datetime,open,close,high,low,volume,return".split(",")]
@@ -77,6 +93,7 @@ def get_equity_data(
 def get_account_summary(
     app: IBApp, config: DevConfig, name: str = "All", reqId: int = 1
 ) -> dict:
+    app.ad_finished[reqId] = False
     try:
         app.connect(
             host=config.IB_HOST, port=config.IB_PORT, clientId=config.IB_CLIENT_ID
@@ -91,7 +108,7 @@ def get_account_summary(
 
     app.reqAccountSummary(reqId, name, ACCOUNT_SUMMARY_TAGS)
 
-    while not app.ad_finished:
+    while not app.ad_finished[reqId]:
         time.sleep(0.5)
 
     app.disconnect()

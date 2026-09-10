@@ -1,5 +1,5 @@
 from ibapi.client import EClient
-from ibapi.contract import Contract
+from ibapi.contract import Contract, ContractDetails
 from ibapi.wrapper import EWrapper
 from ibapi.common import BarData
 
@@ -32,15 +32,29 @@ class Account:
 class IBApp(EWrapper, EClient):
     def __init__(self) -> None:
         EClient.__init__(self, self)
-        self.data = []
+        self.data = {}
         self.positions = {}
         self.account = {}
-        self.hd_finished = False
+        self.hd_finished = {}
         self.pd_finished = False
-        self.ad_finished = False
+        self.ad_finished = {}
+        self.contract_details = {}
+        self.cd_finished = {}
+
+    def contractDetails(self, reqId: int, contractDetails: ContractDetails):
+        if reqId not in self.contract_details:
+            # print(f"Adding new contract ID {reqId}")
+            self.contract_details[reqId] = None
+
+        self.contract_details[reqId] = contractDetails
+
+    def contractDetailsEnd(self, reqId: int):
+        self.cd_finished[reqId] = True
 
     def historicalData(self, reqId: int, bar: BarData) -> None:
-        self.data.append(
+        if reqId not in self.data:
+            self.data[reqId] = []
+        self.data[reqId].append(
             {
                 "datetime": bar.date,
                 "open": bar.open,
@@ -53,7 +67,7 @@ class IBApp(EWrapper, EClient):
 
     def historicalDataEnd(self, reqId: int, start: str, end: str):
         print("Finished retrieving Historical Market Data")
-        self.hd_finished = True
+        self.hd_finished[reqId] = True
 
     def updatePortfolio(
         self,
@@ -66,9 +80,10 @@ class IBApp(EWrapper, EClient):
         realizedPNL: float,
         accountName: str,
     ):
-        self.positions[contract.conId] = {
-            "symbol": contract.symbol,
+        self.positions[contract.symbol] = {
+            "id": contract.conId,
             "secType": contract.secType,
+            "primaryExchange": contract.primaryExchange,
             "currency": contract.currency,
             "position": position,
             "marketPrice": marketPrice,
@@ -89,7 +104,7 @@ class IBApp(EWrapper, EClient):
 
     def accountSummaryEnd(self, reqId: int):
         print("Finished retrieving Account data")
-        self.ad_finished = True
+        self.ad_finished[reqId] = True
 
 
 def run_loop(app: IBApp):
