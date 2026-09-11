@@ -35,8 +35,9 @@ def get_equity_data(
         app.connect(
             host=config.IB_HOST, port=config.IB_PORT, clientId=config.IB_CLIENT_ID
         )
+        time.sleep(1)
     except Exception as e:
-        print("Could not connect to ibkr gateway")
+        print(f"Could not connect to ibkr gateway: {e}")
         sys.exit(0)
 
     thread = Thread(target=run_loop, args=(app,))
@@ -66,16 +67,15 @@ def get_equity_data(
     app.reqHistoricalData(
         reqId=reqId,
         contract=contract,
-        endDateTime=end_time,
+        endDateTime="",
         durationStr=dur,
         barSizeSetting="1 day",
-        whatToShow="TRADES",
+        whatToShow="ADJUSTED_LAST",
         useRTH=1,
         formatDate=1,
         keepUpToDate=False,
         chartOptions=[],
     )
-
     while not app.hd_finished[reqId]:
         time.sleep(0.5)
 
