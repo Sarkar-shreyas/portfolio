@@ -15,7 +15,7 @@ class Config:
 
     # Conventions
     annualise: int = 252
-    risk_free_rate: float = 0.0
+    risk_free_rate: float = 0.0363
 
     # Technical analysis
     sma_window: int = 21
@@ -33,6 +33,7 @@ class Config:
     # filepath
     root_dir: Path = Path(os.getenv("ROOT", ""))
     cache_dir: Path = Path(root_dir / "src/backend/cache")
+    trial_dir: Path = Path(root_dir / "trial_data")
 
 
 @dataclass
@@ -40,6 +41,7 @@ class DevConfig(Config):
     IB_HOST: str = os.getenv("host", "127.0.0.1")
     IB_PORT: int = int(os.getenv("port", 4001))
     IB_CLIENT_ID: int = int(os.getenv("clientId", 1))
+    ALPHA_VANTAGE_KEY: str = str(os.getenv("ALPHA_VANTAGE_KEY", ""))
 
 
 @dataclass
