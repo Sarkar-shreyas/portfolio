@@ -106,6 +106,10 @@ class IBApp(EWrapper, EClient):
         print("Finished retrieving Account data")
         self.ad_finished[reqId] = True
 
+    def error(self, reqId: int, errorCode: int, errorString: str):
+        if errorCode not in [2104, 2106, 2158]:
+            print(reqId, errorCode, errorString)
+
 
 def run_loop(app: IBApp):
     app.run()
