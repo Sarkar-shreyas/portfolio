@@ -5,6 +5,7 @@ import sys
 from ibapi.contract import Contract
 import requests
 import os
+from typing import Optional
 
 # from ibapi.account_summary_tags import AccountSummaryTags
 import json
@@ -240,3 +241,57 @@ def get_benchmark_data(app: IBApp, config: DevConfig, reqId: int) -> pd.DataFram
     df = pd.DataFrame(app.data[reqId])
 
     return df
+
+
+def get_fama_factors(
+    config: DevConfig,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    index_col: int = 0,
+    skiprows: int = 4,
+    header: int = 0,
+    skipfooter: int = 2,
+    engine: str = "python",
+    given_filename: str = "fama_french_daily_five.csv",
+    save_filename: str = "FF_five_factor.csv",
+    cols: list = [],
+    save: bool = True,
+) -> pd.DataFrame:
+    """Loads the daily fama french factors from the csv file uploaded in the project root, then saves the given date range to the cache."""
+    if os.path.exists(f"{config.cache_dir}/{save_filename}"):
+        print("Loading cached Fama-French data.")
+        fama_data = pd.read_csv(
+            f"{config.cache_dir}/{save_filename}",
+            parse_dates=True,
+            index_col=index_col,
+            header=header,
+        )
+    elif os.path.exists(f"{config.root_dir}/{given_filename}"):
+        fama_data = pd.read_csv(
+            f"{config.root_dir}/{given_filename}",
+            parse_dates=True,
+            index_col=index_col,
+            skiprows=skiprows,
+            header=header,
+            skipfooter=skipfooter,
+            engine=engine,  # type: ignore
+        )
+    else:
+        raise RuntimeError(
+            "Could not find fama french CSV file. Check given_filename or file location."
+        )
+    if not cols:
+        cols = list(fama_data.columns)
+    if start_date is None and end_date is None:
+        fama = fama_data.copy()
+    elif end_date is None:
+        fama = fama_data.copy().loc[start_date:, cols]
+    elif start_date is None:
+        fama = fama_data.copy().loc[:end_date, cols]
+    else:
+        fama = fama_data.copy().loc[start_date:end_date, cols]
+
+    if save:
+        fama.to_csv(f"{config.cache_dir}/{save_filename}")
+
+    return fama
