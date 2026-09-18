@@ -11,6 +11,48 @@ from src.backend.analysis.returns import (
 from src.backend.analysis.vol import ann_volatility, rolling_volatility
 
 
+def get_correlation(data: pd.DataFrame) -> pd.DataFrame:
+    """Computes the correlation matrix for a given dataframe of returns"""
+    return data.corr()
+
+
+def rolling_correlation(
+    config: DevConfig, data: pd.DataFrame, cols: list, window: Optional[int] = None
+) -> pd.DataFrame:
+    """Computes the rolling correlations matrix for the specified columns of a given dataframe"""
+    if window is None:
+        window = config.sma_window
+    if len(cols) < 2:
+        raise ValueError("Cannot compute correlations for fewer than two columns.")
+    if not cols:
+        print(
+            "No columns were specified. Computing correlations for first two columns."
+        )
+        cols = list(data.columns)
+    rolling_corr = data[cols[0]].rolling(window).corr(data[cols[1]])
+    return rolling_corr
+
+
+def get_covariance(data: pd.DataFrame) -> pd.DataFrame:
+    """Computes the covariance matrix for a given dataframe of returns"""
+    return data.cov()
+
+
+def rolling_covariance(
+    config: DevConfig, data: pd.DataFrame, cols: list, window: Optional[int] = None
+) -> pd.DataFrame:
+    """Computes the rolling covariance matrix for the specified columns of a given dataframe"""
+    if window is None:
+        window = config.sma_window
+    if len(cols) < 2:
+        raise ValueError("Cannot compute covariance for fewer than two columns.")
+    if not cols:
+        print("No columns were specified. Computing covariances for first two columns.")
+        cols = list(data.columns)
+    rolling_cov = data[cols[0]].rolling(window).cov(data[cols[1]])
+    return rolling_cov
+
+
 def ann_sharpe(
     config: DevConfig,
     data: pd.Series,
