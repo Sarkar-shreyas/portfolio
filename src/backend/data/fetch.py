@@ -238,6 +238,7 @@ def get_benchmark_data(app: IBApp, config: DevConfig, reqId: int) -> pd.DataFram
 
     app.disconnect()
     time.sleep(1)
+    print("App disconnected.")
     df = pd.DataFrame(app.data[reqId])
 
     return df
