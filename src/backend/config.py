@@ -20,6 +20,7 @@ class Config:
     # Technical analysis
     sma_window: int = 21
     ema_window: int = 21
+    pca_components: int = 2
 
     # Risk Metrics
     vol_window: int = 21
