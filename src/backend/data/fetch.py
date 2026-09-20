@@ -95,7 +95,7 @@ def get_equity_data(
 
     app.disconnect()
     time.sleep(1)
-    df = pd.DataFrame(app.data[reqId])
+    df = pd.DataFrame(app.data.get(reqId, []))
 
     return df
 
@@ -239,7 +239,7 @@ def get_benchmark_data(app: IBApp, config: DevConfig, reqId: int) -> pd.DataFram
     app.disconnect()
     time.sleep(1)
     print("App disconnected.")
-    df = pd.DataFrame(app.data[reqId])
+    df = pd.DataFrame(app.data.get(reqId, []))
 
     return df
 
@@ -284,15 +284,15 @@ def get_fama_factors(
     if not cols:
         cols = list(fama_data.columns)
     if start_date is None and end_date is None:
-        fama = fama_data.copy()
+        fama = fama_data.copy().loc[:, cols]
     elif end_date is None:
         fama = fama_data.copy().loc[start_date:, cols]
     elif start_date is None:
         fama = fama_data.copy().loc[:end_date, cols]
     else:
         fama = fama_data.copy().loc[start_date:end_date, cols]
-
-    fama.rename(columns={"Mkt-RF": "Mkt"}, inplace=True)
+    if "Mkt-RF" in cols:
+        fama.rename(columns={"Mkt-RF": "Mkt"}, inplace=True)
     if save:
         fama.to_csv(f"{config.cache_dir}/{save_filename}")
 
