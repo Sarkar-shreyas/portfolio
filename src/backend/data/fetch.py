@@ -292,6 +292,7 @@ def get_fama_factors(
     else:
         fama = fama_data.copy().loc[start_date:end_date, cols]
 
+    fama.rename(columns={"Mkt-RF": "Mkt"}, inplace=True)
     if save:
         fama.to_csv(f"{config.cache_dir}/{save_filename}")
 

@@ -37,7 +37,7 @@ def capm_regression(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Perform an OLS regression on a given returns dataframe, following the CAPM model. Assumes the data represents excess returns"""
     target = data.columns[0]
-    formula_str = f"{target} ~ Mkt-RF"
+    formula_str = f"{target} ~ Mkt"
     model = ols(formula=formula_str, data=data).fit()
     summary_df = pd.DataFrame(
         {
@@ -51,7 +51,7 @@ def capm_regression(
     )
     data_df = pd.DataFrame(
         {
-            "actual": data[[target]],
+            "actual": data[target],
             "resid": model.resid,
             "fittedvalues": model.fittedvalues,
         }
@@ -63,7 +63,7 @@ def fama_french_three(
     config: DevConfig, data: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Perform an OLS regression on a given returns dataframe, following the Fama-French 3-factor model."""
-    factors = ["Mkt-RF", "SMB", "HML"]
+    factors = ["Mkt", "SMB", "HML"]
     target = data.columns[0]
     formula_str = f"{target} ~ {' + '.join(factors)}"
     model = ols(formula=formula_str, data=data).fit()
@@ -79,7 +79,7 @@ def fama_french_three(
     )
     data_df = pd.DataFrame(
         {
-            "actual": data[[target]],
+            "actual": data[target],
             "resid": model.resid,
             "fittedvalues": model.fittedvalues,
         }
@@ -91,7 +91,7 @@ def fama_french_five(
     config: DevConfig, data: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Perform an OLS regression on a given returns dataframe, following the Fama-French 5-factor model."""
-    factors = ["Mkt-RF", "SMB", "HML", "RMW", "CMA"]
+    factors = ["Mkt", "SMB", "HML", "RMW", "CMA"]
     target = data.columns[0]
     formula_str = f"{target} ~ {' + '.join(factors)}"
     model = ols(formula=formula_str, data=data).fit()
@@ -107,7 +107,7 @@ def fama_french_five(
     )
     data_df = pd.DataFrame(
         {
-            "actual": data[[target]],
+            "actual": data[target],
             "resid": model.resid,
             "fittedvalues": model.fittedvalues,
         }

@@ -13,12 +13,9 @@ from src.backend.analysis.risk_metrics import (
 
 
 def pca_analysis(
-    config: DevConfig, covariances: pd.DataFrame, n_components: Optional[int] = None
+    config: DevConfig, covariances: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Performs a principal component analysis on the given covariance matrix and returns the specified number of components."""
-    if n_components is None:
-        n_components = config.pca_components
-
     eig_val, eig_vec = np.linalg.eigh(covariances)
     sorted_index = np.argsort(eig_val)[::-1]
     sorted_eigval = eig_val[sorted_index]

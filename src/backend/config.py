@@ -21,12 +21,24 @@ class Config:
     sma_window: int = 21
     ema_window: int = 21
     pca_components: int = 2
+    garch_p: int = 1
+    garch_q: int = 1
+    garch_o: int = 0
+    garch_vol: str = "GARCH"
+    garch_dist: str = "normal"
 
     # Risk Metrics
     vol_window: int = 21
     beta_window: int = 63
     sharpe_window: int = 63
     var_conf: float = 0.95
+
+    # Strategy Metrics
+    rsi_overbought: int = 70
+    rsi_oversold: int = 30
+    short_exposure: float = 0.5
+    long_exposure: float = 0.5
+    tot_exposure: float = 1.0
 
     # Reproducability
     random_seed: int = 42

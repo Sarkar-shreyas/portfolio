@@ -59,3 +59,48 @@ def ema_returns(
     if span is None:
         span = config.ema_window
     return data.ewm(span=span, adjust=False).mean().dropna()
+
+
+def simple_rsi(
+    config: DevConfig, data: pd.Series, window: Optional[int] = None
+) -> pd.Series:
+    """Computes the simple RSI for a given returns series."""
+    if window is None:
+        window = config.sma_window
+    d = data.copy()
+    gains = (
+        d.apply(lambda x: x if x > 0 else 0).shift(1).rolling(window).mean().dropna()
+    )
+    losses = (
+        d.apply(lambda x: -x if x < 0 else 0).shift(1).rolling(window).mean().dropna()
+    )
+    rel_strength = gains / losses
+    rsi = 100 - (100 / (1 + rel_strength))
+    return rsi
+
+
+def ewm_rsi(
+    config: DevConfig, data: pd.Series, span: Optional[int] = None
+) -> pd.Series:
+    """Computes the exponential window RSI for a given returns series"""
+    if span is None:
+        span = config.ema_window
+
+    d = data.copy()
+    gains = (
+        d.apply(lambda x: x if x > 0 else 0)
+        .shift(1)
+        .ewm(span=span, adjust=False)
+        .mean()
+        .dropna()
+    )
+    losses = (
+        d.apply(lambda x: -x if x < 0 else 0)
+        .shift(1)
+        .ewm(span=span, adjust=False)
+        .mean()
+        .dropna()
+    )
+    rel_strength = gains / losses
+    rsi = 100 - (100 / (1 + rel_strength))
+    return rsi

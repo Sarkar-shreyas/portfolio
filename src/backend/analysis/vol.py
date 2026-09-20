@@ -1,7 +1,9 @@
+from arch.univariate.base import ARCHModelResult
 import pandas as pd
 import numpy as np
 from typing import Optional
 from src.backend.config import DevConfig
+from arch import arch_model
 
 
 def ann_volatility(
@@ -33,4 +35,13 @@ def ewma_volatility(
     """Compute the EWMA rolling volatility statistic"""
     if span is None:
         span = config.ema_window
-    return data.ewma(span=span, adjust=False).agg(metric).dropna()
+    return data.ewm(span=span, adjust=False).agg(metric).dropna()
+
+
+def fit_garch(
+    config: DevConfig, data: pd.Series, model_params: dict, fit_params: dict
+) -> ARCHModelResult:
+    """Perform a GARCH or GJR-GARCH volatility analysis on the given returns series."""
+    am = arch_model(data, **model_params)
+    res = am.fit(**fit_params)
+    return res
