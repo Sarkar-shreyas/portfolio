@@ -35,14 +35,13 @@ def equal_split_ls_weights(
     n_long = long_mask.sum(axis=1)
     n_short = short_mask.sum(axis=1)
 
-    n_long.replace(0.0, np.nan, inplace=True)
-    n_short.replace(0.0, np.nan, inplace=True)
+    n_long = n_long.replace(0.0, np.nan)
+    n_short = n_short.replace(0.0, np.nan)
 
-    long_weights = long_mask.div(n_long, axis=0).mul(long_exposure)
-    short_weights = short_mask.div(n_short, axis=0).mul(short_exposure)
+    long_weights = long_mask.div(n_long, axis=0).mul(long_exposure).fillna(0.0)
+    short_weights = -short_mask.div(n_short, axis=0).mul(short_exposure).fillna(0.0)
 
     weights = long_weights + short_weights
-    weights.fillna(0.0, inplace=True)
     return weights
 
 
@@ -85,11 +84,11 @@ def inverse_volatility_split_ls_weights(
     n_long = long_vols.sum(axis=1)
     n_short = short_vols.sum(axis=1)
 
-    n_long.replace(0.0, np.nan, inplace=True)
-    n_short.replace(0.0, np.nan, inplace=True)
+    n_long = n_long.replace(0.0, np.nan)
+    n_short = n_short.replace(0.0, np.nan)
 
     long_weights = long_vols.div(n_long, axis=0).mul(long_exposure).fillna(0.0)
-    short_weights = short_vols.div(n_short, axis=0).mul(short_exposure).fillna(0.0)
+    short_weights = -short_vols.div(n_short, axis=0).mul(short_exposure).fillna(0.0)
 
     weights = long_weights + short_weights
 

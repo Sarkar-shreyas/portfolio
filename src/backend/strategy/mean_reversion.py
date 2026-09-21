@@ -16,12 +16,9 @@ def rsi_mean_reversion(
         rsi_overbought = config.rsi_overbought
     if rsi_oversold is None:
         rsi_oversold = config.rsi_oversold
-    oversold = data[data < rsi_oversold]
-    overbought = data[data > rsi_overbought]
-
-    signal = data.copy()
-    signal[signal.isnull()] = 0
-    signal[oversold] = 1
-    signal[overbought] = -1
-    signal.rename("signal", inplace=True)
+    # oversold = data[data < rsi_oversold]
+    # overbought = data[data > rsi_overbought]
+    signal = pd.Series(0, index=data.index, name="signal")
+    signal[data < rsi_oversold] = 1
+    signal[data > rsi_overbought] = -1
     return signal
