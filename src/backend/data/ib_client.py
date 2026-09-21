@@ -30,6 +30,30 @@ class Account:
 
 
 class IBApp(EWrapper, EClient):
+    """
+    Class instance inheriting from ibapi's EWrapper and EClient classes. Overwrites several
+    methods to enable simpler data storage and track event completion.
+
+    Parameters:
+    -----------
+    data: dict
+        Bar data retrieved by historicalData, keyed by request ID (int)
+    positions: dict
+        Portfolio data retrieved by updatePortfolio, keyed by asset symbols (str)
+    account: dict
+        Account summary info retrieved by accountSummary, keyed by account tag (str)
+    hd_finished: dict
+        Boolean flag representing a historicalData request has completed successfully, keyed by request ID (int)
+    pd_finished: bool
+        Boolean flag representing an updatePortfolio request has completed successfully.
+    ad_finished: dict
+        Boolean flags representing an accountSummary request has completed successfully, keyed by request ID (int)
+    contract_details: dict
+        Stores contract details retrieved from contractDetails, keyed by request ID (int)
+    cd_finished: dict
+        Boolean flag representing a contractDetails request has completed successfully, keyed by request ID (int)
+    """
+
     def __init__(self) -> None:
         EClient.__init__(self, self)
         self.data = {}
@@ -112,4 +136,5 @@ class IBApp(EWrapper, EClient):
 
 
 def run_loop(app: IBApp):
+    """Helper function for easy referral to threads."""
     app.run()
