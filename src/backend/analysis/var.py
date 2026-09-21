@@ -13,7 +13,7 @@ def est_var(config: DevConfig, data: pd.Series, conf: Optional[float] = None) ->
     if conf is None:
         conf = config.var_conf
 
-    return -np.percentile(data, conf * 100)
+    return np.percentile(data, (1 - conf) * 100)
 
 
 def cond_var(config: DevConfig, data: pd.Series, conf: Optional[float] = None) -> float:

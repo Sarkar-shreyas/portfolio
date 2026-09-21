@@ -18,13 +18,13 @@ from src.backend.analysis.var import (
 
 def test_est_var_matches_manual_percentile(config, returns_series):
     result = est_var(config, returns_series)
-    expected = -np.percentile(returns_series, config.var_conf * 100)
+    expected = np.percentile(returns_series, (1 - config.var_conf) * 100)
     assert result == pytest.approx(expected)
 
 
 def test_est_var_custom_confidence(config, returns_series):
     result = est_var(config, returns_series, conf=0.99)
-    expected = -np.percentile(returns_series, 99)
+    expected = np.percentile(returns_series, 1)
     assert result == pytest.approx(expected)
 
 
@@ -34,7 +34,7 @@ def test_est_var_known_values():
 
     data = pd.Series(np.arange(1, 101))  # 1..100
     result = est_var(_Cfg(), data)
-    expected = -np.percentile(data, 90)
+    expected = np.percentile(data, 10)
     assert result == pytest.approx(expected)
 
 

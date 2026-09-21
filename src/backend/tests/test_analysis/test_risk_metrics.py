@@ -46,8 +46,8 @@ def test_rolling_correlation_matches_manual_computation(config, multi_asset_retu
     window = 20
     cols = ["AssetA", "AssetB"]
     result = rolling_correlation(config, multi_asset_returns, cols, window=window)
-    expected = multi_asset_returns[cols[0]].rolling(window).corr(
-        multi_asset_returns[cols[1]]
+    expected = (
+        multi_asset_returns[cols[0]].rolling(window).corr(multi_asset_returns[cols[1]])
     )
     pd.testing.assert_series_equal(result, expected)
 
@@ -61,7 +61,9 @@ def test_rolling_correlation_default_window_uses_config(config, multi_asset_retu
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_rolling_correlation_raises_for_fewer_than_two_columns(config, multi_asset_returns):
+def test_rolling_correlation_raises_for_fewer_than_two_columns(
+    config, multi_asset_returns
+):
     with pytest.raises(ValueError):
         rolling_correlation(config, multi_asset_returns, ["AssetA"])
 
@@ -85,13 +87,15 @@ def test_rolling_covariance_matches_manual_computation(config, multi_asset_retur
     window = 20
     cols = ["AssetA", "AssetB"]
     result = rolling_covariance(config, multi_asset_returns, cols, window=window)
-    expected = multi_asset_returns[cols[0]].rolling(window).cov(
-        multi_asset_returns[cols[1]]
+    expected = (
+        multi_asset_returns[cols[0]].rolling(window).cov(multi_asset_returns[cols[1]])
     )
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_rolling_covariance_raises_for_fewer_than_two_columns(config, multi_asset_returns):
+def test_rolling_covariance_raises_for_fewer_than_two_columns(
+    config, multi_asset_returns
+):
     with pytest.raises(ValueError):
         rolling_covariance(config, multi_asset_returns, ["AssetB"])
 
@@ -153,7 +157,8 @@ def test_ann_sortino_uses_only_negative_returns(config):
     # With no negative returns, the downside-deviation term should be zero,
     # producing an infinite (or undefined) Sortino ratio.
     data = pd.Series([0.01] * 30)
-    result = ann_sortino(config, data)
+    with np.errstate(divide="ignore"):
+        result = ann_sortino(config, data)
     assert np.isinf(result) or np.isnan(result)
 
 
