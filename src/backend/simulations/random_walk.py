@@ -48,7 +48,9 @@ def additive_random_walk(
     if seed is None:
         seed = config.random_seed
 
-    random_steps = norm.rvs(loc=mu, scale=sigma, size=(n_paths, n_timesteps))
+    random_steps = norm.rvs(
+        loc=mu, scale=sigma, size=(n_paths, n_timesteps), random_state=seed
+    )
     sim_prices = S0 + np.cumsum(random_steps, axis=1)
 
     initial_prices = np.full((n_paths, 1), S0)
@@ -99,7 +101,9 @@ def multiplicative_random_walk(
     if seed is None:
         seed = config.random_seed
 
-    random_returns = norm.rvs(loc=mu, scale=sigma, size=(n_paths, n_timesteps))
+    random_returns = norm.rvs(
+        loc=mu, scale=sigma, size=(n_paths, n_timesteps), random_state=seed
+    )
     sim_prices = S0 * np.cumprod(1 + random_returns, axis=1)
 
     initial_prices = np.full((n_paths, 1), S0)
@@ -164,9 +168,11 @@ def gbm(
     else:
         sigma_arr = sigma
 
-    random_shocks = norm.rvs(size=(n_paths, n_timesteps))
+    random_shocks = norm.rvs(size=(n_paths, n_timesteps), random_state=seed)
 
-    price_increments = (mu_arr - 0.5 * sigma_arr**2) * dt + (sigma_arr * random_shocks)
+    price_increments = (mu_arr - 0.5 * sigma_arr**2) * dt + (
+        sigma_arr * np.sqrt(dt) * random_shocks
+    )
     log_paths = np.cumsum(price_increments, axis=1)
     sim_prices = S0 * np.exp(log_paths)
     initial_prices = np.full((n_paths, 1), S0)

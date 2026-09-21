@@ -109,7 +109,8 @@ def mc_norm_port_var(
         size=n_paths,
         random_state=seed,
     )
-    rand_port_rets = rand_rets @ weights.to_numpy()
+    rand_rets = np.asarray(rand_rets).reshape(n_paths, len(mus))
+    rand_port_rets = rand_rets @ weights.reindex(mus.index).to_numpy()
     mc_var = np.quantile(rand_port_rets, 1 - conf)
     mc_cvar = np.mean(rand_port_rets[rand_port_rets < mc_var])
     return mc_var, mc_cvar
