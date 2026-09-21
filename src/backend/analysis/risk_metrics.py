@@ -1,6 +1,6 @@
 import pandas as pd
 
-# import numpy as np
+import numpy as np
 from typing import Optional
 from src.backend.config import DevConfig
 from src.backend.analysis.returns import (
@@ -9,6 +9,21 @@ from src.backend.analysis.returns import (
     rolling_returns,
 )
 from src.backend.analysis.vol import ann_volatility, rolling_volatility
+
+
+def get_metrics(data: pd.Series | pd.DataFrame) -> pd.Series | pd.DataFrame:
+    """
+    Computes several key statistics for each column of the input data.
+    """
+    metrics = data.agg(["max", "min", "mean", "median", "std", "skew", "kurtosis"])
+    lower = np.quantile(data.dropna(), 0.25, axis=0)
+    upper = np.quantile(data.dropna(), 0.75, axis=0)
+    iqr = upper - lower
+    metrics.loc["0.25"] = pd.Series(lower, index=data.columns)
+    metrics.loc["0.75"] = pd.Series(upper, index=data.columns)
+    metrics.loc["iqr"] = pd.Series(iqr, index=data.columns)
+    metrics = metrics.T
+    return metrics
 
 
 def get_correlation(data: pd.DataFrame) -> pd.DataFrame:
