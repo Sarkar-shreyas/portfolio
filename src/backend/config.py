@@ -16,6 +16,10 @@ class Config:
     # Conventions
     annualise: int = 252
     risk_free_rate: float = 0.0363
+    n_paths: int = 100000
+    n_timesteps: int = 252
+    var_conf: float = 0.95
+    T: float = 1.0
 
     # Technical analysis
     sma_window: int = 21
@@ -31,7 +35,6 @@ class Config:
     vol_window: int = 21
     beta_window: int = 63
     sharpe_window: int = 63
-    var_conf: float = 0.95
 
     # Strategy Metrics
     rsi_overbought: int = 70
