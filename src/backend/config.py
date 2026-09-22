@@ -43,6 +43,13 @@ class Config:
     long_exposure: float = 0.5
     tot_exposure: float = 1.0
 
+    # Backtesting Conventions
+    cost_bps: int = 10
+    train_frac: float = 0.7
+    window_type: str = "rolling"
+    window_freq: str = "M"
+    window_len: int = 36
+
     # Reproducability
     random_seed: int = 42
 
