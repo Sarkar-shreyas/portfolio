@@ -4,7 +4,7 @@ from typing import Optional
 from scipy.stats import norm, t
 
 from src.backend.config import DevConfig
-from src.backend.analysis.returns import rolling_returns, returns, ann_returns
+from src.backend.analysis.returns import rolling_returns, simple_returns, ann_returns
 from src.backend.analysis.risk_metrics import max_daily_drawdowns
 
 

@@ -4,7 +4,7 @@ from typing import Optional
 from src.backend.config import DevConfig
 
 
-def returns(data: pd.Series) -> pd.Series:
+def simple_returns(data: pd.Series) -> pd.Series:
     """Computes simple returns given the close price"""
     returns = data.pct_change()
     return returns
