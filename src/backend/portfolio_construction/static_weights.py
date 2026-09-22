@@ -29,3 +29,10 @@ def mkt_cap_weight_benchmark(
         mkt_cap_weights * tot_exposure, index=mkt_caps.index, name="weights"
     )
     return port_weights
+
+
+def turnover(config: DevConfig, weights: pd.DataFrame) -> pd.Series:
+    """
+    Computes the turnover for a given change in portfolio weights
+    """
+    return weights.diff().abs().sum(axis=1)
