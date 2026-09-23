@@ -87,7 +87,7 @@ def rolling_sharpe(
     """Computes the rolling Sharpe ratio over a given window"""
     if window is None:
         window = config.sharpe_window
-    daily_rf = (1 + config.risk_free_rate) ** 1 / 252 - 1
+    daily_rf = ((1 + config.risk_free_rate) ** (1 / 252)) - 1
     excess_ret = data - daily_rf
     rolling_ret = rolling_returns(config, excess_ret, window)
     rolling_vol = rolling_volatility(config, excess_ret, window)
@@ -113,7 +113,7 @@ def rolling_sortino(
     """Computes the rolling Sortino ratio over a given window"""
     if window is None:
         window = config.sharpe_window
-    daily_rf = (1 + config.risk_free_rate) ** 1 / 252 - 1
+    daily_rf = ((1 + config.risk_free_rate) ** (1 / 252)) - 1
     excess_ret = data - daily_rf
     loss = data.copy()
     loss = loss.apply(lambda x: x if x < 0 else 0)
