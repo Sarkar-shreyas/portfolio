@@ -54,7 +54,8 @@ def inverse_volatility_weighted(
     """Compute portfolio weights by the inverse of ticker volatility"""
     if tot_exposure is None:
         tot_exposure = config.tot_exposure
-    vol = signals.div(volatilities)
+    volatility = volatilities.reindex(index=signals.index, columns=signals.columns)
+    vol = signals.div(volatility)
     vol_exposure = vol.abs().sum(axis=1).replace(0.0, np.nan)
     normed = vol.div(vol_exposure, axis=0).mul(tot_exposure).fillna(0.0)
 
@@ -73,11 +74,11 @@ def inverse_volatility_split_ls_weights(
         long_exposure = config.long_exposure
     if short_exposure is None:
         short_exposure = config.short_exposure
-
+    volatility = volatilities.reindex(index=signals.index, columns=signals.columns)
     long_mask = signals.eq(1)
     short_mask = signals.eq(-1)
 
-    inv_vol = 1 / volatilities
+    inv_vol = 1 / volatility
     long_vols = inv_vol.where(long_mask, 0.0)
     short_vols = inv_vol.where(short_mask, 0.0)
 

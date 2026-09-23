@@ -137,7 +137,7 @@ class WalkForwardBacktester:
             weights = self._construct_portfolio(signals, portfolio_args)
             if isinstance(weights, pd.DataFrame):
                 # Final weights for that period are assumed the target weights
-                target_weights = weights.iloc[-1]
+                target_weights = weights.loc[train_data.index[-1]]
             else:
                 target_weights = weights
 

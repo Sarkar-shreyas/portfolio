@@ -21,7 +21,7 @@ def rolling_volatility(
     config: DevConfig,
     data: pd.Series,
     period: Optional[int] = None,
-    metric: str = "mean",
+    metric: str = "std",
 ) -> pd.Series:
     """Compute the simple rolling volatility statistic"""
     if period is None:
@@ -30,7 +30,7 @@ def rolling_volatility(
 
 
 def ewma_volatility(
-    config: DevConfig, data: pd.Series, span: Optional[int] = None, metric: str = "mean"
+    config: DevConfig, data: pd.Series, span: Optional[int] = None, metric: str = "std"
 ) -> pd.Series:
     """Compute the EWMA rolling volatility statistic"""
     if span is None:
