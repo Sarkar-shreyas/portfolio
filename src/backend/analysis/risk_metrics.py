@@ -125,9 +125,9 @@ def rolling_sortino(
 
 def daily_drawdowns(config: DevConfig, data: pd.Series) -> pd.Series:
     """Computes the drawdown array for a given return series"""
-    cum_returns = cumulative_returns(data)
-    running_max = (cum_returns + 1).cummax()
-    drawdowns = data / running_max - 1
+    wealth = cumulative_returns(data) + 1
+    running_max = wealth.cummax()
+    drawdowns = wealth / running_max - 1
     return drawdowns
 
 
@@ -172,6 +172,7 @@ def ann_calmar(config: DevConfig, data: pd.Series) -> float:
     """Computes the Calmar ratio for a given return series"""
     ann_ret = ann_returns(config, data)
     max_draw = max_drawdown(config, data)
-
-    calmar = (ann_ret - config.risk_free_rate) / max_draw
+    if max_draw == 0:
+        return np.nan
+    calmar = (ann_ret - config.risk_free_rate) / np.abs(max_draw)
     return calmar
