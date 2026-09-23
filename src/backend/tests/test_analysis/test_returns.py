@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from src.backend.analysis.returns import (
-    returns,
+    simple_returns,
     log_returns,
     cumulative_returns,
     ann_returns,
@@ -21,18 +21,18 @@ from src.backend.analysis.returns import (
 
 
 def test_returns_matches_pct_change(price_series):
-    result = returns(price_series)
+    result = simple_returns(price_series)
     pd.testing.assert_series_equal(result, price_series.pct_change())
 
 
 def test_returns_first_value_is_nan(price_series):
-    result = returns(price_series)
+    result = simple_returns(price_series)
     assert np.isnan(result.iloc[0])
 
 
 def test_returns_known_values():
     prices = pd.Series([100.0, 110.0, 121.0, 108.9])
-    result = returns(prices)
+    result = simple_returns(prices)
     expected = pd.Series([np.nan, 0.10, 0.10, -0.10])
     pd.testing.assert_series_equal(result, expected)
 
@@ -49,7 +49,7 @@ def test_log_returns_matches_manual_formula(price_series):
 
 
 def test_log_returns_close_to_simple_returns_for_small_moves(price_series):
-    simple = returns(price_series).dropna()
+    simple = simple_returns(price_series).dropna()
     log_ret = log_returns(price_series).dropna()
     # For small daily moves, log returns approximate simple returns.
     np.testing.assert_allclose(log_ret.values, simple.values, atol=1e-3)
@@ -63,9 +63,7 @@ def test_log_returns_close_to_simple_returns_for_small_moves(price_series):
 def test_cumulative_returns_known_values():
     rets = pd.Series([0.1, 0.2, -0.1])
     result = cumulative_returns(rets)
-    expected = pd.Series(
-        [1.1 - 1, 1.1 * 1.2 - 1, 1.1 * 1.2 * 0.9 - 1]
-    )
+    expected = pd.Series([1.1 - 1, 1.1 * 1.2 - 1, 1.1 * 1.2 * 0.9 - 1])
     pd.testing.assert_series_equal(result, expected)
 
 
@@ -83,7 +81,9 @@ def test_cumulative_returns_matches_price_growth(price_series, returns_series):
 # ---------------------------------------------------------------------------
 
 
-def test_ann_returns_with_ann_equal_to_n_days_matches_total_return(config, returns_series):
+def test_ann_returns_with_ann_equal_to_n_days_matches_total_return(
+    config, returns_series
+):
     n_days = len(returns_series)
     result = ann_returns(config, returns_series, ann=n_days)
     expected_total = cumulative_returns(returns_series).iloc[-1]

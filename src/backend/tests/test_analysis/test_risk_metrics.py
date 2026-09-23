@@ -188,9 +188,9 @@ def test_rolling_sortino_matches_manual_composition(config, returns_series):
 
 def test_daily_drawdowns_matches_manual_formula(config, returns_series):
     result = daily_drawdowns(config, returns_series)
-    cum_returns = cumulative_returns(returns_series)
-    running_max = (cum_returns + 1).cummax()
-    expected = returns_series / running_max - 1
+    wealth = cumulative_returns(returns_series) + 1
+    running_max = wealth.cummax()
+    expected = wealth / running_max - 1
     pd.testing.assert_series_equal(result, expected)
 
 
@@ -245,5 +245,11 @@ def test_ann_calmar_matches_manual_composition(config, returns_series):
     result = ann_calmar(config, returns_series)
     ann_ret = ann_returns(config, returns_series)
     max_draw = max_drawdown(config, returns_series)
-    expected = (ann_ret - config.risk_free_rate) / max_draw
+    expected = (ann_ret - config.risk_free_rate) / np.abs(max_draw)
     assert result == pytest.approx(expected)
+
+
+def test_ann_calmar_returns_nan_for_zero_drawdown(config):
+    zero_returns_series = pd.Series(0)
+    result = ann_calmar(config, zero_returns_series)
+    assert result is np.nan
