@@ -196,18 +196,18 @@ def test_get_equity_data_call_order(dev_config, app):
     assert names.index("reqHistoricalData") < names.index("disconnect")
 
 
-def test_get_equity_data_exits_when_connection_fails(dev_config, app_factory):
+def test_get_equity_data_raises_when_connection_fails(dev_config, app_factory):
     app = app_factory(connect_error=ConnectionRefusedError("gateway down"))
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Could not connect to IB Gateway"):
         get_equity_data(app, dev_config, conid=4815747)
     assert "reqContractDetails" not in app.call_names()
 
 
-def test_get_equity_data_exits_when_contract_unresolved(dev_config, app_factory, sample_bars):
+def test_get_equity_data_raises_when_contract_unresolved(dev_config, app_factory, sample_bars):
     app = app_factory(
         bars=sample_bars, contract_details=make_contract_details(contract=None)
     )
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Could not retrieve contract"):
         get_equity_data(app, dev_config, conid=999)
     assert "disconnect" in app.call_names()
     assert "reqHistoricalData" not in app.call_names()
@@ -297,9 +297,9 @@ def test_get_account_summary_returns_the_live_app_dict(dev_config, app):
     assert result is app.account
 
 
-def test_get_account_summary_exits_when_connection_fails(dev_config, app_factory):
+def test_get_account_summary_raises_when_connection_fails(dev_config, app_factory):
     app = app_factory(connect_error=ConnectionRefusedError("gateway down"))
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Could not connect to IB Gateway"):
         get_account_summary(app, dev_config)
     assert "reqAccountSummary" not in app.call_names()
 
@@ -376,9 +376,9 @@ def test_get_portfolio_data_returns_the_live_app_dict(dev_config, app):
     assert get_portfolio_data(app, dev_config) is app.positions
 
 
-def test_get_portfolio_data_exits_when_connection_fails(dev_config, app_factory):
+def test_get_portfolio_data_raises_when_connection_fails(dev_config, app_factory):
     app = app_factory(connect_error=ConnectionRefusedError("gateway down"))
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Could not connect to IB Gateway"):
         get_portfolio_data(app, dev_config)
     assert "reqAccountUpdates" not in app.call_names()
 
@@ -446,21 +446,21 @@ def test_get_market_cap_throttles_between_requests(dev_config, fake_requests, fa
     assert fake_time.slept == [1, 1]
 
 
-def test_get_market_cap_exits_when_the_request_fails(dev_config, fake_requests):
+def test_get_market_cap_raises_when_the_request_fails(dev_config, fake_requests):
     fake_requests.error = RuntimeError("network down")
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Error retrieving info for NVDA"):
         get_market_cap(dev_config, ["NVDA"])
 
 
-def test_get_market_cap_exits_on_missing_market_cap_field(dev_config, fake_requests):
+def test_get_market_cap_raises_on_missing_market_cap_field(dev_config, fake_requests):
     fake_requests.payloads = {"NVDA": {"Note": "rate limit reached"}}
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Error retrieving info for NVDA"):
         get_market_cap(dev_config, ["NVDA"])
 
 
-def test_get_market_cap_exits_on_non_numeric_market_cap(dev_config, fake_requests):
+def test_get_market_cap_raises_on_non_numeric_market_cap(dev_config, fake_requests):
     fake_requests.payloads = {"NVDA": {"MarketCapitalization": "None"}}
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Error retrieving info for NVDA"):
         get_market_cap(dev_config, ["NVDA"])
 
 
@@ -532,17 +532,17 @@ def test_get_benchmark_data_disconnects_after_success(dev_config, app):
     assert app.connected is False
 
 
-def test_get_benchmark_data_exits_when_connection_fails(dev_config, app_factory):
+def test_get_benchmark_data_raises_when_connection_fails(dev_config, app_factory):
     app = app_factory(connect_error=ConnectionRefusedError("gateway down"))
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Could not connect to IB Gateway"):
         get_benchmark_data(app, dev_config, reqId=1)
 
 
-def test_get_benchmark_data_exits_when_contract_unresolved(dev_config, app_factory, sample_bars):
+def test_get_benchmark_data_raises_when_contract_unresolved(dev_config, app_factory, sample_bars):
     app = app_factory(
         bars=sample_bars, contract_details=make_contract_details(contract=None)
     )
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError, match="Could not retrieve contract"):
         get_benchmark_data(app, dev_config, reqId=1)
     assert "reqHistoricalData" not in app.call_names()
 

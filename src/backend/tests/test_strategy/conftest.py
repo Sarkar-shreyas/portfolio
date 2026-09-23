@@ -115,3 +115,19 @@ def price_series(rng) -> pd.Series:
 def returns_series(price_series) -> pd.Series:
     """Simple daily returns derived from ``price_series``."""
     return price_series.pct_change().dropna()
+
+
+@pytest.fixture
+def portfolio_tickers() -> list[str]:
+    """The ticker universe used by the panel-level crossover fixtures."""
+    return ["AAA", "BBB", "CCC"]
+
+
+@pytest.fixture
+def price_panel(rng, portfolio_tickers) -> pd.DataFrame:
+    """A (dates x tickers) panel of strictly positive close prices."""
+    n = 150
+    idx = pd.bdate_range("2023-01-02", periods=n)
+    steps = rng.normal(0.0005, 0.012, size=(n, len(portfolio_tickers)))
+    prices = 100.0 * np.exp(np.cumsum(steps, axis=0))
+    return pd.DataFrame(prices, index=idx, columns=portfolio_tickers)

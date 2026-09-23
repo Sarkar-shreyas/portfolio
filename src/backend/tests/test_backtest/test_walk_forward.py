@@ -948,6 +948,10 @@ def test_run_composes_the_per_fold_helpers(
         ]
 
         open_prices = test.iloc[0]
+        # The book is marked to market on the rebalance bar before it is
+        # resized, so the target is expressed against the capital actually
+        # standing at the trade date rather than the previous fold's close.
+        current_capital = (current_shares * open_prices).sum() + cash
         target_shares = target_weights * current_capital / open_prices
         trade_shares = target_shares - current_shares
 
@@ -1339,14 +1343,32 @@ def test_first_fold_capital_is_the_starting_capital(history_entry):
     assert entry["fold_capital"].iloc[0] == pytest.approx(backtester.start_capital)
 
 
-def test_fold_capital_carries_the_previous_folds_closing_equity(history_entry):
+def test_fold_capital_is_the_book_marked_on_the_rebalance_bar(history_entry):
+    # Capital is the book marked to market on the trade date, so it is that
+    # bar's equity gross of the transaction cost charged on the same bar.
+    _, entry, _ = history_entry
+    dates = entry["fold_capital"].index
+    equity_on_trade_dates = entry["equity_curve"].loc[dates]
+    assert entry["fold_capital"].to_numpy() == pytest.approx(
+        (equity_on_trade_dates + entry["fold_costs"]).to_numpy()
+    )
+
+
+def test_fold_capital_starts_at_the_opening_capital(history_entry):
+    # The first rebalance has no book to mark, so it sizes off start capital.
+    backtester, entry, _ = history_entry
+    assert entry["fold_capital"].iloc[0] == pytest.approx(backtester.start_capital)
+
+
+def test_fold_capital_is_not_the_previous_folds_stale_close(history_entry):
+    # Guards the fix for sizing on stale equity: the capital a fold trades
+    # against must be marked on its own rebalance bar, not carried unchanged
+    # from the previous fold's final close one bar earlier.
     _, entry, folds = history_entry
     equity = entry["equity_curve"]
-    for position, (_, test) in enumerate(folds[1:], start=1):
-        previous_close = folds[position - 1][1].index[-1]
-        assert entry["fold_capital"].iloc[position] == pytest.approx(
-            equity.loc[previous_close]
-        )
+    stale = [equity.loc[folds[position - 1][1].index[-1]] for position in range(1, len(folds))]
+    marked = entry["fold_capital"].to_numpy()[1:]
+    assert not np.allclose(marked, stale)
 
 
 def test_cash_is_recorded_after_the_trade_settles(history_entry):
