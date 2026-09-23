@@ -51,8 +51,7 @@ def get_equity_data(
         )
         time.sleep(1)
     except Exception as e:
-        print(f"Could not connect to ibkr gateway: {e}")
-        sys.exit(0)
+        raise RuntimeError(f"Could not connect to IB Gateway: {e}")
 
     thread = Thread(target=run_loop, args=(app,))
     thread.start()
@@ -72,9 +71,8 @@ def get_equity_data(
     print(contract)
 
     if not contract:
-        print("Error: Could not retrieve contract")
         app.disconnect()
-        sys.exit(0)
+        raise RuntimeError(f"Could not retrieve contract for id {con_reqId}")
 
     print(f"{ticker}: {contract}")
     # end_time = time.strftime("%Y%m%d %H:%M:%S")
@@ -114,8 +112,7 @@ def get_account_summary(
             host=config.IB_HOST, port=config.IB_PORT, clientId=config.IB_CLIENT_ID
         )
     except Exception as e:
-        print(f"Could not connect to ibkr gateway: {e}")
-        sys.exit(0)
+        raise RuntimeError(f"Could not connect to IB Gateway: {e}")
 
     thread = Thread(target=run_loop, args=(app,))
     thread.start()
@@ -144,8 +141,7 @@ def get_portfolio_data(app: IBApp, config: DevConfig) -> dict:
             host=config.IB_HOST, port=config.IB_PORT, clientId=config.IB_CLIENT_ID
         )
     except Exception as e:
-        print(f"Could not connect to ibkr gateway: {e}")
-        sys.exit(0)
+        raise RuntimeError(f"Could not connect to IB Gateway: {e}")
 
     thread = Thread(target=run_loop, args=(app,))
     thread.start()
@@ -177,8 +173,7 @@ def get_market_cap(config: DevConfig, symbols: list = []) -> dict:
             data = r.json()
             ticker_data[symbol.strip().upper()] = int(data["MarketCapitalization"])
         except Exception as e:
-            print(f"Error retrieving info for {symbol}: {e}")
-            sys.exit(0)
+            raise RuntimeError(f"Error retrieving info for {symbol}: {e}")
         time.sleep(1)
     return ticker_data
 
@@ -195,8 +190,7 @@ def get_benchmark_data(app: IBApp, config: DevConfig, reqId: int) -> pd.DataFram
         )
         time.sleep(1)
     except Exception as e:
-        print(f"Could not connect to ibkr gateway: {e}")
-        sys.exit(0)
+        raise RuntimeError(f"Could not connect to IB Gateway: {e}")
 
     thread = Thread(target=run_loop, args=(app,))
     thread.start()
@@ -216,9 +210,8 @@ def get_benchmark_data(app: IBApp, config: DevConfig, reqId: int) -> pd.DataFram
     print(contract)
 
     if not contract:
-        print("Error: Could not retrieve SPX contract")
         app.disconnect()
-        sys.exit(0)
+        raise RuntimeError(f"Could not retrieve contract for id {con_reqId}")
 
     # end_time = time.strftime("%Y%m%d %H:%M:%S")
     app.reqHistoricalData(
