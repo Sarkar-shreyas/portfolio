@@ -24,7 +24,9 @@ class Config:
 
     # Technical analysis
     sma_window: int = 21
+    sma_short_window: int = 5
     ema_window: int = 21
+    ema_short_window: int = 5
     pca_components: int = 2
     garch_p: int = 1
     garch_q: int = 1
