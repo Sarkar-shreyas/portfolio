@@ -7,7 +7,6 @@ from pathlib import Path
 @dataclass
 class Config:
     # Data params
-
     exchange: str = "SMART"
     currency: str = "USD"
     sec_type: str = "STK"
@@ -49,6 +48,7 @@ class Config:
     window_type: str = "rolling"
     window_freq: str = "M"
     window_len: int = 36
+    start_capital: float = 100000.0
 
     # Reproducability
     random_seed: int = 42

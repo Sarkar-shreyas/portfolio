@@ -32,7 +32,10 @@ class MktState:
 
 
 def linear_cost(
-    config: DevConfig, orders: Order | np.ndarray, cost_bps: Optional[float] = None
+    config: DevConfig,
+    orders: Order | np.ndarray,
+    mkt_states: Optional[MktState | np.ndarray] = None,
+    cost_bps: Optional[float] = None,
 ) -> float | np.ndarray:
     """
     Computes the cost of orders using a simplified linear cost model: |q_i| * p_i * c/10000,
