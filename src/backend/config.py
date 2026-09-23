@@ -1,7 +1,9 @@
 from dataclasses import dataclass
-import dotenv
+from dotenv import load_dotenv
 import os
 from pathlib import Path
+
+load_dotenv()
 
 
 @dataclass
@@ -61,9 +63,9 @@ class Config:
 
 @dataclass
 class DevConfig(Config):
-    IB_HOST: str = os.getenv("host", "127.0.0.1")
-    IB_PORT: int = int(os.getenv("port", 4001))
-    IB_CLIENT_ID: int = int(os.getenv("clientId", 1))
+    IB_HOST: str = os.getenv("IB_HOST", "127.0.0.1")
+    IB_PORT: int = int(os.getenv("IB_PORT", 4001))
+    IB_CLIENT_ID: int = int(os.getenv("IB_CLIENT_ID", 1))
     ALPHA_VANTAGE_KEY: str = str(os.getenv("ALPHA_VANTAGE_KEY", ""))
 
 
