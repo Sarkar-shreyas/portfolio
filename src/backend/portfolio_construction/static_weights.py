@@ -35,4 +35,20 @@ def turnover(config: DevConfig, weights: pd.DataFrame) -> pd.Series:
     """
     Computes the turnover for a given change in portfolio weights
     """
-    return weights.diff().abs().sum(axis=1)
+    changes = weights.diff()
+    changes.iloc[0] = weights.iloc[0]
+    return changes.abs().sum(axis=1)
+
+
+def avg_gross_exposure(config: DevConfig, weights: pd.DataFrame) -> float:
+    """
+    Computes the average gross exposure to each individual asset in a portfolio
+    """
+    return weights.abs().sum(axis=1).mean()
+
+
+def avg_net_exposure(config: DevConfig, weights: pd.DataFrame) -> float:
+    """
+    Computes the average net exposure to each individual asset in a portfolio
+    """
+    return weights.sum(axis=1).mean()
