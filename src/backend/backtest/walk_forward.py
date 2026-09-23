@@ -116,7 +116,6 @@ class WalkForwardBacktester:
                 f"No folds were generated. Train frac: {self.train_frac}, Test frac: {self.test_frac}"
             )
 
-        current_capital = self.start_capital
         current_shares = pd.Series(0.0, index=self.price_data.columns)
         cash = self.start_capital
 
@@ -146,6 +145,7 @@ class WalkForwardBacktester:
             trade_date = test_data.index[0]
             open_prices = test_data.iloc[0]
 
+            current_capital = (current_shares * open_prices).sum() + cash
             target_shares = target_weights * current_capital / open_prices
             trade_shares = target_shares - current_shares
 
@@ -178,7 +178,6 @@ class WalkForwardBacktester:
             oos_equity.append(fold_equity)
             oos_weights.append(position_vals.div(fold_equity, axis=0))
             current_shares = target_shares
-            current_capital = fold_equity.iloc[-1]
 
         oos_weights = pd.concat(oos_weights)
         equity = pd.concat(oos_equity)
