@@ -122,13 +122,45 @@ def test_rolling_sharpe_matches_manual_composition(config, returns_series):
     window = 30
     result = rolling_sharpe(config, returns_series, window=window)
 
-    daily_rf = (1 + config.risk_free_rate) ** 1 / 252 - 1
+    daily_rf = (1 + config.risk_free_rate) ** (1 / config.annualise) - 1
     excess_ret = returns_series - daily_rf
     rolling_ret = excess_ret.rolling(window).agg("mean").dropna()
-    rolling_vol = excess_ret.rolling(window).agg("mean").dropna()
+    rolling_vol = excess_ret.rolling(window).agg("std").dropna()
     expected = rolling_ret / rolling_vol
 
     pd.testing.assert_series_equal(result, expected)
+
+
+def test_rolling_sharpe_is_not_degenerate(config, returns_series):
+    # The ratio must vary with the data. If the numerator and denominator are
+    # built from the same statistic the series collapses to a constant 1.0,
+    # which is the failure this pins.
+    result = rolling_sharpe(config, returns_series, window=30)
+    assert result.nunique() > 1
+    assert result.std() > 0
+
+
+def test_rolling_sharpe_daily_rf_compounds_to_the_annual_rate(config):
+    # The daily risk-free rate must compound back to the configured annual rate
+    # over one year. Guards the operator-precedence bug that made it ~-0.996.
+    daily_rf = (1 + config.risk_free_rate) ** (1 / config.annualise) - 1
+    assert (1 + daily_rf) ** config.annualise == pytest.approx(
+        1 + config.risk_free_rate
+    )
+
+    # A return series sitting exactly at the risk-free rate has zero excess
+    # return, so the rolling Sharpe numerator -- and the ratio -- must be zero.
+    flat = pd.Series([daily_rf] * 60, index=pd.bdate_range("2024-01-01", periods=60))
+    result = rolling_sharpe(config, flat, window=30)
+    assert result.dropna().eq(0).all() or result.dropna().abs().max() < 1e-9
+
+
+def test_rolling_sharpe_scales_with_excess_return(config, returns_series):
+    # Shifting every return up by a constant raises the numerator while leaving
+    # the rolling standard deviation untouched, so the ratio must rise.
+    base = rolling_sharpe(config, returns_series, window=30)
+    lifted = rolling_sharpe(config, returns_series + 0.01, window=30)
+    assert (lifted > base).all()
 
 
 def test_rolling_sharpe_default_window_uses_sharpe_window(config, returns_series):
@@ -171,14 +203,34 @@ def test_rolling_sortino_matches_manual_composition(config, returns_series):
     window = 30
     result = rolling_sortino(config, returns_series, window=window)
 
-    daily_rf = (1 + config.risk_free_rate) ** 1 / 252 - 1
+    daily_rf = (1 + config.risk_free_rate) ** (1 / config.annualise) - 1
     excess_ret = returns_series - daily_rf
     loss = returns_series.apply(lambda x: x if x < 0 else 0)
     rolling_ret = excess_ret.rolling(window).agg("mean").dropna()
-    loss_vol = loss.rolling(window).agg("mean").dropna()
+    loss_vol = loss.rolling(window).agg("std").dropna()
     expected = rolling_ret / loss_vol
 
     pd.testing.assert_series_equal(result, expected)
+
+
+def test_rolling_sortino_is_not_degenerate(config, returns_series):
+    result = rolling_sortino(config, returns_series, window=30)
+    assert result.nunique() > 1
+    assert result.std() > 0
+
+
+def test_rolling_sortino_denominator_ignores_gains(config):
+    # Downside deviation must not react to upside dispersion. Two series with
+    # identical losses but larger gains share a denominator, so the one with the
+    # bigger gains must score strictly higher everywhere.
+    idx = pd.bdate_range("2024-01-01", periods=60)
+    modest = pd.Series([-0.01, 0.005] * 30, index=idx)
+    generous = pd.Series([-0.01, 0.050] * 30, index=idx)
+
+    modest_result = rolling_sortino(config, modest, window=30).dropna()
+    generous_result = rolling_sortino(config, generous, window=30).dropna()
+
+    assert (generous_result > modest_result).all()
 
 
 # ---------------------------------------------------------------------------

@@ -47,10 +47,18 @@ def test_rolling_volatility_matches_manual_rolling_std(config, returns_series):
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_rolling_volatility_default_metric_is_mean(config, returns_series):
+def test_rolling_volatility_default_metric_is_std(config, returns_series):
     result = rolling_volatility(config, returns_series, period=10)
-    expected = returns_series.rolling(10).agg("mean").dropna()
+    expected = returns_series.rolling(10).agg("std").dropna()
     pd.testing.assert_series_equal(result, expected)
+
+
+def test_rolling_volatility_is_never_negative(config, returns_series):
+    # A volatility estimate is a dispersion measure, so it cannot be negative.
+    # Guards the default metric: a rolling *mean* of returns goes negative
+    # roughly half the time, which silently flips inverse-volatility weights.
+    result = rolling_volatility(config, returns_series, period=10)
+    assert (result >= 0).all()
 
 
 def test_rolling_volatility_default_period_uses_config(config, returns_series):
@@ -71,10 +79,16 @@ def test_ewma_volatility_matches_manual_ewm(config, returns_series):
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_ewma_volatility_default_metric_is_mean(config, returns_series):
+def test_ewma_volatility_default_metric_is_std(config, returns_series):
     result = ewma_volatility(config, returns_series, span=10)
-    expected = returns_series.ewm(span=10, adjust=False).agg("mean").dropna()
+    expected = returns_series.ewm(span=10, adjust=False).agg("std").dropna()
     pd.testing.assert_series_equal(result, expected)
+
+
+def test_ewma_volatility_is_never_negative(config, returns_series):
+    # Same dispersion invariant as rolling_volatility.
+    result = ewma_volatility(config, returns_series, span=10)
+    assert (result >= 0).all()
 
 
 def test_ewma_volatility_default_span_uses_config(config, returns_series):
