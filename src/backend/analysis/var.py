@@ -13,7 +13,7 @@ def est_var(config: DevConfig, data: pd.Series, conf: Optional[float] = None) ->
     if conf is None:
         conf = config.var_conf
 
-    return np.percentile(data, (1 - conf) * 100)
+    return np.nanpercentile(data, (1 - conf) * 100)
 
 
 def cond_var(config: DevConfig, data: pd.Series, conf: Optional[float] = None) -> float:
@@ -31,7 +31,7 @@ def norm_parametric_var(
     data: pd.Series,
     conf: Optional[float] = None,
     window: Optional[int] = None,
-) -> np.ndarray:
+) -> pd.Series:
     """Estimates Value-at-Risk for a given returns series at the given confidence interval, over a rolling window, using the normal distribution"""
     if conf is None:
         conf = config.var_conf
@@ -41,6 +41,7 @@ def norm_parametric_var(
     mu = rolling_data.mean()
     sigma = rolling_data.std(ddof=1)
     var_estimate = -norm.ppf(conf, loc=mu, scale=sigma)
+    var_estimate = pd.Series(var_estimate, index=data.index)
     return var_estimate
 
 
@@ -50,7 +51,7 @@ def t_parametric_var(
     conf: Optional[float] = None,
     window: Optional[int] = None,
     dof: int = 5,
-) -> np.ndarray:
+) -> pd.Series:
     """Estimates Value-at-Risk for a given returns series at the given confidence interval, over a rolling window, using the Students-t distribution"""
     if conf is None:
         conf = config.var_conf
@@ -62,4 +63,5 @@ def t_parametric_var(
     mu = rolling_data.mean()
     sigma = rolling_data.std(ddof=1)
     var_estimate = -t.ppf(1 - conf, df=dof, loc=mu, scale=sigma)
+    var_estimate = pd.Series(var_estimate, index=data.index)
     return rescale_factor * var_estimate

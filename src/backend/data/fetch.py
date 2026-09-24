@@ -1,7 +1,6 @@
 import pandas as pd
 import time
 from threading import Thread
-import sys
 from ibapi.contract import Contract
 import requests
 import os

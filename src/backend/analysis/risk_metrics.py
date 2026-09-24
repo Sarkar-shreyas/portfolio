@@ -15,6 +15,8 @@ def get_metrics(data: pd.Series | pd.DataFrame) -> pd.Series | pd.DataFrame:
     """
     Computes several key statistics for each column of the input data.
     """
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
     metrics = data.agg(["max", "min", "mean", "median", "std", "skew", "kurtosis"])
     lower = np.quantile(data.dropna(), 0.25, axis=0)
     upper = np.quantile(data.dropna(), 0.75, axis=0)
@@ -76,7 +78,8 @@ def ann_sharpe(
 
     ann_ret = ann_returns(config, data)
     ann_vol = ann_volatility(config, data)
-
+    if np.isclose(ann_vol, 0.0, atol=1e-12):
+        return np.nan
     sharpe = (ann_ret - config.risk_free_rate) / ann_vol
     return sharpe
 
@@ -102,7 +105,8 @@ def ann_sortino(config: DevConfig, data: pd.Series) -> float:
     loss = loss.apply(lambda x: x if x < 0 else 0)
     ann_ret = ann_returns(config, data)
     loss_vol = ann_volatility(config, loss)
-
+    if np.isclose(loss_vol, 0.0, atol=1e-12):
+        return np.nan
     sortino = (ann_ret - config.risk_free_rate) / loss_vol
     return sortino
 
