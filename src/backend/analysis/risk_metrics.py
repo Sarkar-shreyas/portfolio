@@ -1,6 +1,6 @@
 import pandas as pd
-
 import numpy as np
+from scipy.stats import norm, skew, kurtosis
 from typing import Optional
 from src.backend.config import DevConfig
 from src.backend.analysis.returns import (
@@ -9,6 +9,22 @@ from src.backend.analysis.returns import (
     rolling_returns,
 )
 from src.backend.analysis.vol import ann_volatility, rolling_volatility
+
+
+def _daily_rf(config: DevConfig) -> float:
+    """Converts the annual risk free rate in config to a daily rate."""
+    return ((1 + config.risk_free_rate) ** (1 / config.annualise)) - 1
+
+
+def _per_period_sharpe(config: DevConfig, data: pd.Series) -> float:
+    """
+    Computes the per-period (non-annualised) Sharpe ratio of the given returns series.
+    """
+    data = data.dropna()
+    volatility = data.std(ddof=1)
+    if np.isclose(volatility, 0.0, atol=1e-12):
+        return np.nan
+    return (data.mean() - _daily_rf(config)) / volatility
 
 
 def get_metrics(data: pd.Series | pd.DataFrame) -> pd.Series | pd.DataFrame:
@@ -90,8 +106,7 @@ def rolling_sharpe(
     """Computes the rolling Sharpe ratio over a given window"""
     if window is None:
         window = config.sharpe_window
-    daily_rf = ((1 + config.risk_free_rate) ** (1 / 252)) - 1
-    excess_ret = data - daily_rf
+    excess_ret = data - _daily_rf(config)
     rolling_ret = rolling_returns(config, excess_ret, window)
     rolling_vol = rolling_volatility(config, excess_ret, window)
     sharpe = rolling_ret / rolling_vol
@@ -117,8 +132,7 @@ def rolling_sortino(
     """Computes the rolling Sortino ratio over a given window"""
     if window is None:
         window = config.sharpe_window
-    daily_rf = ((1 + config.risk_free_rate) ** (1 / 252)) - 1
-    excess_ret = data - daily_rf
+    excess_ret = data - _daily_rf(config)
     loss = data.copy()
     loss = loss.apply(lambda x: x if x < 0 else 0)
     rolling_ret = rolling_returns(config, excess_ret, window)
@@ -180,3 +194,144 @@ def ann_calmar(config: DevConfig, data: pd.Series) -> float:
         return np.nan
     calmar = (ann_ret - config.risk_free_rate) / np.abs(max_draw)
     return calmar
+
+
+def probabilistic_sharpe(
+    config: DevConfig, data: pd.Series, benchmark_sharpe: Optional[float] = None
+) -> float:
+    """
+    Computes the probabilistic Sharpe ratio following Bailey & Lopez de Prado.
+    The probability that the true Sharpe ratio of a given series exceeds a specified
+    benchmark ratio, given its length, skewness and kurtosis.
+
+    Parameters
+    ----------
+    config: DevConfig
+        A DevConfig instance containing default constants
+    data: pd.Series
+        A daily returns series.
+    benchmark_sharpe: float, Optional
+        An optional benchmark sharpe, defaulting to 0.0
+
+    Returns
+    -------
+    float
+        The probabilistic sharpe, returning np.nan if the data has 0 volatility or the
+        variance of the estimator is negative.
+    """
+    if benchmark_sharpe is None:
+        benchmark_sharpe = 0.0
+    data = data.dropna()
+    n_obs = len(data)
+    if n_obs < 3:
+        raise ValueError(
+            f"Cannot perform analysis on fewer than 3 observations: {n_obs}"
+        )
+
+    sharpe = _per_period_sharpe(config, data)
+    if np.isnan(sharpe):
+        return np.nan
+
+    skewness = skew(data, bias=True)
+    kurt = kurtosis(data, fisher=False, bias=True)
+    denom = 1 - skewness * sharpe + (kurt - 1) / 4 * sharpe**2
+    if denom <= 0:
+        return np.nan
+
+    z = (sharpe - benchmark_sharpe) * np.sqrt(n_obs - 1) / np.sqrt(denom)
+    return float(norm.cdf(z))
+
+
+def expected_max_sharpe(
+    config: DevConfig, trial_sharpes: pd.Series, n_trials: Optional[int] = None
+) -> float:
+    """
+    Computes the expected max Sharpe across the n_trials independent trials with 0.0 true
+    Sharpe.
+
+    Parameters
+    ----------
+    config: DevConfig
+        A DevConfig instance containing default constants
+    trial_sharpes: pd.Series
+        Per period Sharpe ratios of trial runs.
+    n_trials: int, Optional
+        An optional number of independent trials, defaults to len(trial_sharpes)
+
+    Returns
+    -------
+    float
+        The per-period expected Sharpe
+    """
+    # Guard against inconsistent dtypes and NaN
+    trial_sharpes = pd.Series(trial_sharpes, dtype=float).dropna()
+    if n_trials is None:
+        n_trials = len(trial_sharpes)
+    if n_trials < 2:
+        return 0.0
+    if len(trial_sharpes) < 2:
+        raise ValueError(
+            f"Cannot estimate variance between fewer than 2 Sharpes: {len(trial_sharpes)}"
+        )
+
+    sharpe_std = np.sqrt(trial_sharpes.var(ddof=1))
+    gamma = np.euler_gamma
+
+    return float(
+        sharpe_std
+        * (
+            (1 - gamma) * norm.ppf(1 - 1 / n_trials)
+            + gamma * norm.ppf(1 - 1 / (n_trials * np.e))
+        )
+    )
+
+
+def deflated_sharpe(
+    config: DevConfig,
+    trial_returns: pd.DataFrame,
+    selected: Optional[str | int] = None,
+    n_trials: Optional[int] = None,
+) -> float:
+    """
+    Computes the deflated Sharpe ratio following Bailey & Lopez de Prado. The probabilistic
+    Sharpe ratio of a selected trial compared against the maximum estimated Sharpe from a
+    given number of trials of pure noise.
+
+    Parameters
+    ----------
+    config: DevConfig
+        A DevConfig instance containing default constants
+    trial_returns: pd.DataFrame
+        A dataframe containing daily returns data. Each column indicates 1 trial.
+    selected: str | int, Optional
+        The column (trial) to evaluate. Defaults to the trial with the highest Sharpe
+    n_trials: int, Optional
+        Number of independent trials, defaulting to the number of usable columns.
+
+    Returns
+    -------
+    float
+        The probability that the observed Sharpe exceeds the adjused benchmark. np.nan
+        if no trial has non-zero volatility
+    """
+    aligned = trial_returns.dropna(how="any")
+    if len(aligned) < len(trial_returns):
+        print(f"Trials do not share all dates, using {len(aligned)} aligned rows.")
+
+    sharpes = aligned.apply(lambda x: _per_period_sharpe(config, x))
+    degen = sharpes.index[sharpes.isna()]
+
+    if len(degen) > 0:
+        print(f"Dropping 0-volatility trials: {list(degen)}")
+        sharpes = sharpes.dropna()
+
+    if sharpes.empty:
+        return np.nan
+
+    if selected is None:
+        selected = sharpes.idxmax()
+    elif selected not in sharpes.index:
+        raise KeyError(f"Cannot select missing trial column: {selected}")
+
+    max_sharpe = expected_max_sharpe(config, sharpes, n_trials)
+    return probabilistic_sharpe(config, aligned[selected], benchmark_sharpe=max_sharpe)
