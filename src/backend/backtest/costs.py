@@ -88,23 +88,49 @@ def sqrt_cost(
     cost_bps: float, Optional
         The cost basis points (bps) for the input orders. Defaults to 10 bps from config.
 
+    Raises
+    ------
+    ValueError
+        If a non-zero order is placed against a daily volume that is zero, negative or
+        NaN. The impact model is undefined there, so no cost is invented for it. A
+        zero-quantity order always costs 0, whatever the volume.
     """
     if cost_bps is None:
         cost_bps = config.cost_bps
     if isinstance(orders, np.ndarray):
-        quantities = np.array([x.quantity for x in orders])
-        prices = np.array([x.price for x in orders])
+        tickers = np.array([x.ticker for x in orders])
+        quantities = np.array([x.quantity for x in orders], dtype=float)
+        prices = np.array([x.price for x in orders], dtype=float)
         # volatilities = np.array([x.volatility for x in orders])
     else:
-        quantities = orders.quantity
-        prices = orders.price
+        tickers = np.array([orders.ticker])
+        quantities = float(orders.quantity)
+        prices = float(orders.price)
         # volatilities = orders.volatility
     if isinstance(mkt_states, np.ndarray):
-        volumes = np.array([x.daily_volume for x in mkt_states])
+        volumes = np.array([x.daily_volume for x in mkt_states], dtype=float)
     else:
-        volumes = mkt_states.daily_volume
+        volumes = float(mkt_states.daily_volume)
 
-    impact_bps = cost_bps * np.sqrt(np.abs(quantities) / volumes)
+    traded = np.abs(quantities) > 0
+    # `volumes > 0` is False for NaN, so this also catches gaps in the volume panel
+    no_liquidity = traded & ~(np.asarray(volumes) > 0)
+    if np.any(no_liquidity):
+        bad = tickers[np.atleast_1d(no_liquidity)]
+        raise ValueError(
+            f"Cannot price a non-zero order against zero or missing daily volume for: {list(bad)}"
+        )
+
+    participation = np.divide(
+        np.abs(quantities),
+        volumes,
+        out=np.zeros(np.shape(quantities)),
+        where=traded,
+    )
+    impact_bps = cost_bps * np.sqrt(participation)
     notional = np.abs(quantities) * prices
+    cost = notional * impact_bps / 10000
 
-    return notional * impact_bps / 10000
+    if np.ndim(cost) == 0:
+        return float(cost)
+    return cost
