@@ -24,8 +24,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from src.backend.analysis.factor_models import capm_regression
 from src.backend.analysis.returns import simple_returns, cumulative_returns, ann_returns
-from src.backend.analysis.risk_metrics import ann_sharpe, max_drawdown, rolling_sharpe
+from src.backend.analysis.risk_metrics import (
+    ann_sharpe,
+    deflated_sharpe,
+    max_drawdown,
+    probabilistic_sharpe,
+    rolling_sharpe,
+)
 from src.backend.analysis.var import cond_var, est_var
 from src.backend.analysis.vol import ann_volatility, rolling_volatility
 from src.backend.portfolio_construction.dynamic_weights import (
@@ -586,3 +593,56 @@ def test_rolling_sharpe_accepts_the_portfolio_returns(workflow, config):
     assert len(rolling) > 0
     assert np.isfinite(rolling).all()
     assert rolling.nunique() > 1
+
+
+# ---------------------------------------------------------------------------
+# Step 10: model-selection and factor diagnostics on the backtest output
+# ---------------------------------------------------------------------------
+
+
+def test_deflated_sharpe_consumes_the_run_history(make_backtester, config, capsys):
+    """A parameter search recorded in runs[n] feeds deflated_sharpe directly."""
+    backtester = make_backtester()
+    for windows in ([5, 21], [3, 15], [10, 42], [5, 63]):
+        backtester.run(windows, [])
+
+    trials = pd.DataFrame(
+        {n: run["net_returns"] for n, run in backtester.runs.items()}
+    )
+
+    # Every run of one backtester covers the same out-of-sample dates, so the
+    # trial frame is complete and no rows are discarded for alignment.
+    assert list(trials.columns) == [1, 2, 3, 4]
+    for run in backtester.runs.values():
+        pd.testing.assert_index_equal(run["net_returns"].index, trials.index)
+    assert not trials.isna().any().any()
+
+    dsr = deflated_sharpe(config, trials)
+    assert "do not share all dates" not in capsys.readouterr().out
+
+    daily_rf = (1 + config.risk_free_rate) ** (1 / config.annualise) - 1
+    best = trials.apply(lambda col: (col.mean() - daily_rf) / col.std()).idxmax()
+    psr = probabilistic_sharpe(config, trials[best])
+    assert np.isfinite(dsr)
+    assert 0.0 <= dsr <= psr <= 1.0
+
+
+def test_factor_regression_consumes_the_backtest_output(workflow, config):
+    """capm_regression keeps the backtest's dates and decomposes its returns exactly."""
+    net_returns = workflow["net_returns"]
+    market = workflow["returns"].mean(axis=1).reindex(net_returns.index)
+    data = pd.DataFrame({"portfolio": net_returns, "Mkt": market})
+
+    summary, fitted = capm_regression(config, data)
+
+    pd.testing.assert_index_equal(fitted.index, net_returns.index)
+    np.testing.assert_allclose(fitted["actual"].values, net_returns.values)
+    np.testing.assert_allclose(
+        (fitted["fittedvalues"] + fitted["resid"]).values,
+        net_returns.values,
+        atol=1e-15,
+    )
+    assert list(summary.index) == ["Intercept", "Mkt"]
+    assert summary.attrs["cov_type"] == "HAC"
+    assert summary.attrs["maxlags"] == int(4 * (len(net_returns) / 100) ** (2 / 9))
+    assert np.isfinite(summary.to_numpy()).all()

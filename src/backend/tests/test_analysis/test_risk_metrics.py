@@ -3,6 +3,8 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import integrate
+from scipy.stats import norm
 
 from src.backend.analysis.returns import ann_returns, cumulative_returns
 from src.backend.analysis.vol import ann_volatility
@@ -21,6 +23,9 @@ from src.backend.analysis.risk_metrics import (
     min_drawdown,
     rolling_drawdown,
     ann_calmar,
+    probabilistic_sharpe,
+    expected_max_sharpe,
+    deflated_sharpe,
 )
 
 
@@ -324,3 +329,222 @@ def test_ann_calmar_returns_nan_for_zero_drawdown(config):
     zero_returns_series = pd.Series(0)
     result = ann_calmar(config, zero_returns_series)
     assert result is np.nan
+
+
+# ---------------------------------------------------------------------------
+# probabilistic_sharpe()
+# ---------------------------------------------------------------------------
+
+
+def _sharpe_by_definition(config, data: pd.Series) -> float:
+    """Per-period Sharpe: mean excess return over the sample std (ddof=1)."""
+    daily_rf = (1 + config.risk_free_rate) ** (1 / config.annualise) - 1
+    return (data.mean() - daily_rf) / data.std(ddof=1)
+
+
+def _two_point(mean: float, spread: float, n_pairs: int) -> pd.Series:
+    """mean +/- spread with equal weight: skew exactly 0, raw kurtosis exactly 1."""
+    return pd.Series(mean + spread * np.tile([1.0, -1.0], n_pairs))
+
+
+def test_psr_is_one_half_against_its_own_sharpe(config, returns_series):
+    own = _sharpe_by_definition(config, returns_series)
+    assert probabilistic_sharpe(config, returns_series, own) == pytest.approx(0.5)
+
+
+def test_psr_default_benchmark_is_zero(config, returns_series):
+    assert probabilistic_sharpe(config, returns_series) == probabilistic_sharpe(
+        config, returns_series, 0.0
+    )
+
+
+def test_psr_matches_the_closed_form_for_a_two_point_distribution(config):
+    # With skew 0 and raw kurtosis 1 the variance term is exactly 1, so
+    # PSR = Phi((SR - SR*) * sqrt(T - 1)). Using excess kurtosis (-2) instead
+    # would give 1 - 3/4 SR^2 and fail this.
+    data = _two_point(0.001, 0.01, 200)
+    sharpe = _sharpe_by_definition(config, data)
+    benchmark = 0.02
+    expected = norm.cdf((sharpe - benchmark) * np.sqrt(len(data) - 1))
+    assert probabilistic_sharpe(config, data, benchmark) == pytest.approx(
+        expected, rel=1e-12
+    )
+
+
+def test_psr_penalises_negative_skew(config, rng):
+    # Mirroring a series about its mean flips the sign of its skew and leaves
+    # the mean, std and kurtosis unchanged.
+    right_skewed = pd.Series(0.002 + 0.01 * (rng.exponential(size=500) - 1))
+    left_skewed = 2 * right_skewed.mean() - right_skewed
+    assert _sharpe_by_definition(config, right_skewed) > 0
+    assert probabilistic_sharpe(config, left_skewed) < probabilistic_sharpe(
+        config, right_skewed
+    )
+
+
+def test_psr_penalises_fat_tails(config):
+    # Same length, mean and variance; raw kurtosis 1 versus 4.
+    spread, mean = 0.01, 0.002
+    thin = pd.Series(mean + spread * np.tile([1, -1, 1, -1, 1, -1, 1, -1], 50))
+    fat = pd.Series(mean + 2 * spread * np.tile([1, 0, 0, 0, -1, 0, 0, 0], 50))
+    assert _sharpe_by_definition(config, thin) == pytest.approx(
+        _sharpe_by_definition(config, fat)
+    )
+    assert probabilistic_sharpe(config, fat) < probabilistic_sharpe(config, thin)
+
+
+def test_psr_rises_with_track_record_length(config):
+    short = _two_point(0.002, 0.01, 50)
+    long = _two_point(0.002, 0.01, 200)
+    assert probabilistic_sharpe(config, long) > probabilistic_sharpe(config, short)
+
+
+def test_psr_skips_the_leading_nan_of_simple_returns(config, returns_series):
+    values = returns_series.reset_index(drop=True)
+    with_nan = pd.concat([pd.Series([np.nan]), values], ignore_index=True)
+    assert probabilistic_sharpe(config, with_nan) == probabilistic_sharpe(
+        config, values
+    )
+
+
+def test_psr_is_nan_for_a_flat_series(config):
+    assert np.isnan(probabilistic_sharpe(config, pd.Series([0.0] * 30)))
+
+
+def test_psr_raises_below_three_observations(config):
+    with pytest.raises(ValueError):
+        probabilistic_sharpe(config, pd.Series([0.01, -0.01]))
+
+
+# ---------------------------------------------------------------------------
+# expected_max_sharpe()
+# ---------------------------------------------------------------------------
+
+
+def test_expected_max_sharpe_is_zero_for_a_single_trial(config):
+    assert expected_max_sharpe(config, pd.Series([0.05])) == 0.0
+    assert expected_max_sharpe(config, pd.Series([0.05, 0.02]), n_trials=1) == 0.0
+
+
+def test_expected_max_sharpe_raises_without_a_variance_estimate(config):
+    with pytest.raises(ValueError):
+        expected_max_sharpe(config, pd.Series([0.05]), n_trials=5)
+
+
+def test_expected_max_sharpe_scales_with_the_sharpe_dispersion(config, rng):
+    # SR0 is linear in sqrt(V): doubling every Sharpe doubles SR0 exactly.
+    sharpes = pd.Series(rng.normal(0, 0.02, 20))
+    assert expected_max_sharpe(config, 2 * sharpes) == pytest.approx(
+        2 * expected_max_sharpe(config, sharpes), rel=1e-12
+    )
+
+
+def test_expected_max_sharpe_rises_with_the_number_of_trials(config, rng):
+    sharpes = pd.Series(rng.normal(0, 0.02, 20))
+    values = [expected_max_sharpe(config, sharpes, n) for n in (2, 10, 100, 1000)]
+    assert values == sorted(values)
+    assert len(set(values)) == len(values)
+
+
+@pytest.mark.parametrize("n_trials", [10, 100, 1000])
+def test_expected_max_sharpe_approximates_the_maximum_of_standard_normals(
+    config, n_trials
+):
+    # Unit-variance Sharpes, so SR0 should approximate E[max of N iid N(0,1)],
+    # computed here by numerical integration. The tolerance is the known error
+    # of the Bailey & Lopez de Prado approximation (~2% at N=10, <1% beyond),
+    # not a fitted constant: writing N*e as N+e is ~12% off and fails.
+    unit_variance = pd.Series([-1.0, 1.0]) / np.sqrt(2)
+    exact = integrate.quad(
+        lambda x: x * n_trials * norm.pdf(x) * norm.cdf(x) ** (n_trials - 1), -10, 10
+    )[0]
+    result = expected_max_sharpe(config, unit_variance, n_trials=n_trials)
+    assert result == pytest.approx(exact, rel=0.03)
+
+
+def test_expected_max_sharpe_ignores_nan_trials(config):
+    sharpes = pd.Series([0.01, 0.03, np.nan, 0.02])
+    assert expected_max_sharpe(config, sharpes) == expected_max_sharpe(
+        config, sharpes.dropna()
+    )
+
+
+# ---------------------------------------------------------------------------
+# deflated_sharpe()
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def trial_returns(rng) -> pd.DataFrame:
+    """Twenty noise trials over three years; trial_0 has a genuine edge."""
+    dates = pd.bdate_range("2022-01-03", periods=756)
+    trials = pd.DataFrame(
+        rng.normal(0.0003, 0.01, size=(756, 20)),
+        index=dates,
+        columns=[f"trial_{i}" for i in range(20)],
+    )
+    trials["trial_0"] += 0.0008
+    return trials
+
+
+def test_dsr_of_a_single_trial_is_its_psr_against_zero(config, trial_returns):
+    single = trial_returns[["trial_0"]]
+    assert deflated_sharpe(config, single) == probabilistic_sharpe(
+        config, trial_returns["trial_0"], 0.0
+    )
+
+
+def test_dsr_is_lower_than_the_undeflated_psr(config, trial_returns):
+    dsr = deflated_sharpe(config, trial_returns)
+    psr = probabilistic_sharpe(config, trial_returns["trial_0"])
+    assert 0.0 <= dsr < psr <= 1.0
+
+
+def test_dsr_defaults_to_the_highest_sharpe_trial(config, trial_returns):
+    sharpes = trial_returns.apply(lambda col: _sharpe_by_definition(config, col))
+    best = sharpes.idxmax()
+    assert deflated_sharpe(config, trial_returns) == deflated_sharpe(
+        config, trial_returns, selected=best
+    )
+
+
+def test_dsr_is_the_selected_psr_against_the_expected_max_sharpe(
+    config, trial_returns
+):
+    sharpes = trial_returns.apply(lambda col: _sharpe_by_definition(config, col))
+    benchmark = expected_max_sharpe(config, sharpes)
+    expected = probabilistic_sharpe(config, trial_returns["trial_5"], benchmark)
+    assert deflated_sharpe(config, trial_returns, selected="trial_5") == pytest.approx(
+        expected, rel=1e-12
+    )
+
+
+def test_dsr_falls_as_more_independent_trials_are_assumed(config, trial_returns):
+    values = [deflated_sharpe(config, trial_returns, n_trials=n) for n in (5, 20, 200)]
+    assert values == sorted(values, reverse=True)
+    assert len(set(values)) == len(values)
+
+
+def test_dsr_raises_for_an_unknown_trial(config, trial_returns):
+    with pytest.raises(KeyError):
+        deflated_sharpe(config, trial_returns, selected="not_a_trial")
+
+
+def test_dsr_drops_zero_volatility_trials(config, trial_returns, capsys):
+    with_flat = trial_returns.assign(flat=0.0)
+    assert deflated_sharpe(config, with_flat) == deflated_sharpe(config, trial_returns)
+    assert "flat" in capsys.readouterr().out
+
+
+def test_dsr_uses_only_the_dates_all_trials_share(config, trial_returns, capsys):
+    ragged = trial_returns.copy()
+    ragged.iloc[:100, 3] = np.nan
+    assert deflated_sharpe(config, ragged) == deflated_sharpe(
+        config, trial_returns.iloc[100:]
+    )
+    assert "656" in capsys.readouterr().out
+
+
+def test_dsr_is_nan_when_every_trial_is_flat(config, trial_returns):
+    flat = pd.DataFrame(0.0, index=trial_returns.index, columns=["a", "b"])
+    assert np.isnan(deflated_sharpe(config, flat))
