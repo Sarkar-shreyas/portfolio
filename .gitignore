@@ -4,6 +4,7 @@
 __pycache__/
 venv/
 cache/
-*.ipynb
 *trial*
 *.vscode
+*.ipynb_checkpoints
+.ipynb_checkpoints/
