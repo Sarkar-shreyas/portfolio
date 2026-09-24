@@ -24,6 +24,7 @@ market data
 import pandas as pd
 
 from src.backend.config import DevConfig
+from src.backend.data import to_panel
 from src.backend.analysis import ann_returns, ann_volatility, ann_sharpe, max_drawdown, est_var
 from src.backend.strategy import sma_crossover_portfolio
 from src.backend.portfolio_construction import equal_active_weights
@@ -32,7 +33,11 @@ from src.backend.backtest.walk_forward import WalkForwardBacktester
 
 config = DevConfig()
 
-# close and volume are (dates x tickers) frames sharing one DatetimeIndex
+# frames: {ticker: OHLCV DataFrame}, e.g. one clean_timeseries output per ticker.
+# to_panel stitches one field into a (dates x tickers) frame on the union of dates.
+close = to_panel(frames, "close")
+volume = to_panel(frames, "volume")
+
 backtester = WalkForwardBacktester(
     config=config,
     price_data=close,
@@ -41,7 +46,7 @@ backtester = WalkForwardBacktester(
     weight_fn=equal_active_weights,
     cost_model=linear_cost,
     cost_bps=10,
-    window_params={"window_type": "rolling", "window_freq": "D", "window_len": 21},
+    window_params={"window_type": "rolling", "window_len": 21},
     train_frac=0.5,
 )
 
@@ -91,6 +96,84 @@ several parameterisations can be compared without re-running:
 
 `clear_runs()` drops the history when it gets large.
 
+## Plotting a run
+
+`vis/backtest_plots.py` charts a run record directly:
+
+```python
+from src.backend.vis import plot_backtest_summary, plot_equity_curve
+
+run = backtester.runs[1]
+fig, axes = plot_backtest_summary(config, run, benchmark=spx_returns)
+fig.savefig("docs/images/backtest_summary.png", dpi=150)
+```
+
+`plot_backtest_summary` draws three stacked panels on a shared date axis: the
+out-of-sample equity curve (with an optional benchmark rebased to the starting capital),
+the drawdown from the running peak with its deepest point labelled, and the rolling
+Sharpe ratio. The title carries the run's settings, Sharpe and maximum drawdown. The
+panels are also available on their own — `plot_equity_curve`, `plot_drawdown` and
+`plot_rolling_sharpe` — each drawing on an axes you pass in, so they compose into your
+own layouts:
+
+```python
+fig, ax = plt.subplots()
+plot_equity_curve(config, backtester.runs[1], ax, params_dict={"label": "5/21"})
+plot_equity_curve(config, backtester.runs[2], ax, params_dict={"label": "10/50"})
+```
+
+The rolling Sharpe is annualised by `sqrt(config.annualise)` by default
+(`annualised=False` plots the per-period ratio), with the window defaulting to
+`config.sharpe_window`. Unlike the other `vis` helpers, which take `(data, ax,
+params_dict)`, these take `config` first, because they compute analysis quantities from
+it.
+
+## Judging a parameter search
+
+The best of many backtests looks better than it is. `deflated_sharpe` (Bailey & López de
+Prado) corrects the winning run's Sharpe ratio for the number of runs tried, their
+spread, and the skewness, kurtosis and length of its return series, and returns the
+probability that its true Sharpe beats what selection alone would produce:
+
+```python
+from src.backend.analysis import deflated_sharpe, probabilistic_sharpe
+
+for short, long in [(5, 21), (5, 63), (10, 50), (20, 100)]:
+    backtester.run(signal_args=[short, long], portfolio_args=[])
+
+trials = pd.DataFrame({n: run["net_returns"] for n, run in backtester.runs.items()})
+
+deflated_sharpe(config, trials)               # the best run, deflated for 4 trials
+deflated_sharpe(config, trials, selected=2)   # a specific run
+probabilistic_sharpe(config, trials[1])       # one run, no deflation (benchmark 0)
+```
+
+Only the dates every trial shares are used, and zero-volatility runs are dropped. `n_trials`
+should count *independent* trials; close parameter variations are highly correlated, so
+pass a smaller `n_trials` rather than letting the raw run count over-deflate.
+
+## Factor regressions
+
+`capm_regression`, `fama_french_three`, `fama_french_five` and `regress` each return
+`(summary, fitted)`: a coefficient table (`coef`, `std err`, `t`, `P>|t|`, `0.025`,
+`0.975`) and a frame of actual, fitted and residual values.
+
+Standard errors default to Newey-West HAC, because daily factor returns are serially
+correlated and heteroskedastic and plain OLS understates the uncertainty. The coefficients
+are the same either way; only the inference columns change.
+
+```python
+summary, fitted = fama_french_three(config, data)                          # HAC, lags by rule
+summary, fitted = fama_french_three(config, data, maxlags=10)              # HAC, fixed lags
+summary, fitted = fama_french_three(config, data, cov_type="nonrobust")    # classical OLS
+summary.attrs    # {"cov_type": "HAC", "maxlags": 4}
+```
+
+The defaults are `config.regression_cov_type` (`"HAC"`) and `config.hac_maxlags`. When no
+lag length is given, the Newey-West rule `floor(4 * (T / 100) ** (2 / 9))` is used, which
+is 4 lags for a year of daily data. Any other statsmodels `cov_type` (e.g. `"HC0"`) is
+passed through.
+
 ## Contracts
 
 The backtester defines the shape every pluggable piece has to satisfy. The three
@@ -117,19 +200,23 @@ A few invariants matter enough to state explicitly:
   drifted book and the new target. The book is marked to market on the rebalance bar
   before it is resized, so the realised gross exposure matches the target up to the
   transaction cost charged on that bar.
+- **`sqrt_cost` needs volume wherever it trades.** An order with no quantity always costs 0,
+  but a non-zero order against zero, negative or missing daily volume raises a `ValueError`
+  naming the tickers, because the square-root impact model has no answer there. Fill or
+  drop gaps in the volume panel before backtesting with it.
 
 ## Layout
 
 | Path | Contents |
 |---|---|
 | `src/backend/config.py` | `Config`, `DevConfig`, `TestConfig` dataclasses holding every default constant |
-| `src/backend/data/` | IBKR and AlphaVantage retrieval, Fama-French factor loading, CSV/JSON caching, timeseries cleaning |
-| `src/backend/analysis/` | returns, volatility (incl. GARCH), correlation and covariance, Sharpe/Sortino/Calmar, drawdowns, VaR/CVaR, factor regressions, PCA |
+| `src/backend/data/` | IBKR and AlphaVantage retrieval, Fama-French factor loading, CSV/JSON caching, timeseries cleaning, `to_panel` for `(dates x tickers)` frames |
+| `src/backend/analysis/` | returns, volatility (incl. GARCH), correlation and covariance, Ledoit-Wolf shrinkage, Sharpe/Sortino/Calmar, probabilistic and deflated Sharpe, drawdowns, VaR/CVaR, factor regressions with HAC standard errors, PCA |
 | `src/backend/strategy/` | signal generation: SMA/EMA crossover and RSI mean reversion, single-asset and portfolio variants |
 | `src/backend/portfolio_construction/` | equal-weight, long/short split, inverse-volatility weighting, benchmarks, turnover and exposure helpers |
 | `src/backend/backtest/` | `WalkForwardBacktester`, `Order`/`MktState`, `linear_cost` and `sqrt_cost` |
 | `src/backend/simulations/` | Monte Carlo VaR (single asset and portfolio), additive/multiplicative random walks, GBM |
-| `src/backend/vis/` | candlestick, timeseries, histogram, QQ and heatmap helpers |
+| `src/backend/vis/` | backtest run charts (equity curve, drawdown, rolling Sharpe, three-panel summary), candlestick, timeseries, histogram, QQ and heatmap helpers |
 | `src/backend/tests/` | the test suite, mirroring the package layout |
 
 Every analysis function takes a config instance as its first argument and reads its
@@ -168,18 +255,23 @@ the cached copy when one exists rather than reconnecting.
 pytest
 ```
 
-780 tests, all deterministic and offline — external data sources are mocked, and
+907 tests, all deterministic and offline — external data sources are mocked, and
 synthetic data is seeded from `TestConfig.random_seed`.
 
 | Suite | Tests |
 |---|---|
-| `test_analysis/` | 107 |
-| `test_backtest/` | 201 |
-| `test_data/` | 165 |
+| `test_analysis/` | 168 |
+| `test_backtest/` | 208 |
+| `test_data/` | 169 |
 | `test_portfolio_construction/` | 103 |
 | `test_simulations/` | 96 |
 | `test_strategy/` | 77 |
-| `test_integration/` | 31 |
+| `test_vis/` | 53 |
+| `test_integration/` | 33 |
+
+`test_vis/` runs on matplotlib's non-interactive Agg backend and asserts on what each
+helper drew — the data behind every line, fill and image, plus labels and counts — rather
+than comparing rendered images.
 
 `test_integration/` is the one suite that composes the whole library rather than testing
 a function in isolation. It runs the workflow above end to end on synthetic data and
@@ -187,7 +279,9 @@ checks the properties that only exist between modules: that index and column ali
 survives every stage, that the walk-forward process has no look-ahead, that transaction
 costs reach the P&L at the right magnitude, and that the portfolio return on a
 non-trading day equals the previous day's weights dotted with that day's asset returns.
-Start there when changing anything that crosses a module boundary.
+It also feeds the backtester's run history into `deflated_sharpe` and its returns into
+`capm_regression`, checking that both keep the backtest's dates. Start there when changing
+anything that crosses a module boundary.
 
 The root `conftest.py` exists only to anchor pytest's path insertion at the project root
 so `from src.backend... import ...` resolves however pytest is invoked.
@@ -197,12 +291,11 @@ so `from src.backend... import ...` resolves however pytest is invoked.
 - Not packaged — there is no `pyproject.toml`, so the library is used from the project
   root rather than installed. Imports are absolute from `src.backend`.
 - IBKR is the only live equity data source. `yfinance` support may be added later.
-- `cov_shrinkage` in `analysis/pca_risk.py` passes a covariance matrix to scikit-learn's
-  `LedoitWolf`, which expects a sample matrix; its output is not currently meaningful.
-  `pca_analysis` works correctly on a plain covariance matrix from `get_covariance`.
 - The backtester models no margin or financing cost, so levered and short books carry
   negative cash without being charged for it.
-- `window_params["window_freq"]` is accepted but unused; `window_len` is a number of
-  bars, not a calendar period.
+- `window_params["window_len"]` is a number of bars, not a calendar period.
+- `to_panel` joins tickers on the union of their dates, so a ticker missing a day
+  leaves a NaN in that row; the backtester does not fill these for you.
+- `clean_timeseries` expects IBKR's column layout for frames without a DatetimeIndex.
 - `portfolio_construction/optimised_weights.py` is a placeholder for mean-variance and
   risk-parity construction.
