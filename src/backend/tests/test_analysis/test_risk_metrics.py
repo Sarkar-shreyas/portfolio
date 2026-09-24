@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -113,6 +115,22 @@ def test_ann_sharpe_matches_manual_composition(config, returns_series):
     assert result == pytest.approx(expected)
 
 
+def test_ann_sharpe_is_nan_for_a_flat_book(config):
+    # A zero-weight backtest produces exactly-zero returns.
+    data = pd.Series([0.0] * 30)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = ann_sharpe(config, data)
+    assert np.isnan(result)
+
+
+def test_ann_sharpe_is_nan_for_a_constant_nonzero_return(config):
+    # The sample std of a constant series is ~1e-19 in floating point rather
+    # than exactly 0; that must not be read as a finite, enormous Sharpe.
+    data = pd.Series([0.001] * 252)
+    assert np.isnan(ann_sharpe(config, data))
+
+
 # ---------------------------------------------------------------------------
 # rolling_sharpe()
 # ---------------------------------------------------------------------------
@@ -185,13 +203,14 @@ def test_ann_sortino_matches_manual_composition(config, returns_series):
     assert result == pytest.approx(expected)
 
 
-def test_ann_sortino_uses_only_negative_returns(config):
-    # With no negative returns, the downside-deviation term should be zero,
-    # producing an infinite (or undefined) Sortino ratio.
-    data = pd.Series([0.01] * 30)
-    with np.errstate(divide="ignore"):
+def test_ann_sortino_is_nan_with_no_losing_days(config):
+    # No negative returns means zero downside deviation; the ratio is undefined
+    # and should be NaN (matching ann_calmar), not inf with a RuntimeWarning.
+    data = pd.Series([0.01, 0.02, 0.0, 0.03] * 10)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
         result = ann_sortino(config, data)
-    assert np.isinf(result) or np.isnan(result)
+    assert np.isnan(result)
 
 
 # ---------------------------------------------------------------------------

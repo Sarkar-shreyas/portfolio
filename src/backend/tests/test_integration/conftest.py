@@ -94,7 +94,7 @@ def volume_panel(ohlcv_panel, tickers) -> pd.DataFrame:
 @pytest.fixture(scope="module")
 def window_params() -> dict:
     """Short OOS windows so the panel yields several rebalances."""
-    return {"window_type": "rolling", "window_freq": "D", "window_len": 21}
+    return {"window_type": "rolling", "window_len": 21}
 
 
 @pytest.fixture(scope="module")

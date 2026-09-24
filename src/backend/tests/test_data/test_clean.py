@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.backend.data.clean import clean_timeseries
+from src.backend.data.clean import clean_timeseries, to_panel
 
 OHLCV = ["datetime", "open", "close", "high", "low", "volume"]
 
@@ -159,3 +159,51 @@ def test_does_not_mutate_datetime_indexed_input(datetime_indexed_frame):
 
 def test_returns_a_new_object(datetime_indexed_frame):
     assert clean_timeseries(datetime_indexed_frame) is not datetime_indexed_frame
+
+
+# ---------------------------------------------------------------------------
+# to_panel()
+# ---------------------------------------------------------------------------
+
+
+def _bars(dates: list[str], close: list[float], volume: list[float]) -> pd.DataFrame:
+    return pd.DataFrame(
+        {"close": close, "volume": volume}, index=pd.DatetimeIndex(dates)
+    )
+
+
+def test_to_panel_has_one_column_per_ticker_in_input_order():
+    frames = {
+        "BBB": _bars(["2023-01-03", "2023-01-04"], [1.0, 2.0], [10, 20]),
+        "AAA": _bars(["2023-01-03", "2023-01-04"], [3.0, 4.0], [30, 40]),
+    }
+    assert list(to_panel(frames, "close").columns) == ["BBB", "AAA"]
+
+
+def test_to_panel_takes_the_requested_field_from_each_ticker():
+    frames = {
+        "AAA": _bars(["2023-01-03", "2023-01-04"], [1.0, 2.0], [10, 20]),
+        "BBB": _bars(["2023-01-03", "2023-01-04"], [3.0, 4.0], [30, 40]),
+    }
+    close = to_panel(frames, "close")
+    volume = to_panel(frames, "volume")
+    assert close.loc["2023-01-04", "BBB"] == 4.0
+    assert volume.loc["2023-01-03", "AAA"] == 10
+
+
+def test_to_panel_aligns_tickers_on_the_union_of_dates():
+    # A date one ticker lacks becomes NaN rather than shifting its values.
+    frames = {
+        "AAA": _bars(["2023-01-03", "2023-01-04"], [1.0, 2.0], [10, 20]),
+        "BBB": _bars(["2023-01-04"], [4.0], [40]),
+    }
+    close = to_panel(frames, "close")
+    assert list(close.index) == list(pd.DatetimeIndex(["2023-01-03", "2023-01-04"]))
+    assert np.isnan(close.loc["2023-01-03", "BBB"])
+    assert close.loc["2023-01-04", "BBB"] == 4.0
+
+
+def test_to_panel_raises_on_a_missing_field():
+    frames = {"AAA": _bars(["2023-01-03"], [1.0], [10])}
+    with pytest.raises(KeyError):
+        to_panel(frames, "open")

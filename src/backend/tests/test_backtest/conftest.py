@@ -70,7 +70,7 @@ def volume_data(rng, dates, tickers) -> pd.DataFrame:
 @pytest.fixture
 def window_params() -> dict:
     """Short OOS windows so the 120-row panel yields several folds."""
-    return {"window_type": "rolling", "window_freq": "D", "window_len": 10}
+    return {"window_type": "rolling", "window_len": 10}
 
 
 # ---------------------------------------------------------------------------

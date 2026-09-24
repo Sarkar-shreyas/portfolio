@@ -140,3 +140,33 @@ def test_t_parametric_var_leading_values_are_nan(config, returns_series):
     window = 30
     result = t_parametric_var(config, returns_series, window=window)
     assert np.all(np.isnan(result[: window - 1]))
+
+
+# ---------------------------------------------------------------------------
+# NaN handling and index preservation
+# ---------------------------------------------------------------------------
+
+
+def test_est_var_skips_the_leading_nan_of_simple_returns(config, returns_series):
+    with_nan = pd.concat(
+        [pd.Series([np.nan], index=[returns_series.index[0] - pd.Timedelta(days=1)]),
+         returns_series]
+    )
+    assert est_var(config, with_nan) == est_var(config, returns_series)
+
+
+def test_cond_var_skips_the_leading_nan_of_simple_returns(config, returns_series):
+    with_nan = pd.concat(
+        [pd.Series([np.nan], index=[returns_series.index[0] - pd.Timedelta(days=1)]),
+         returns_series]
+    )
+    assert cond_var(config, with_nan) == cond_var(config, returns_series)
+
+
+@pytest.mark.parametrize("fn", [norm_parametric_var, t_parametric_var])
+def test_parametric_var_returns_a_series_indexed_like_the_input(
+    config, returns_series, fn
+):
+    result = fn(config, returns_series)
+    assert isinstance(result, pd.Series)
+    pd.testing.assert_index_equal(result.index, returns_series.index)

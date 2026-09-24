@@ -132,13 +132,12 @@ def test_init_defaults_window_params_to_config(make_backtester, config):
     params = make_backtester(window_params=None).window_params
     assert params == {
         "window_type": config.window_type,
-        "window_freq": config.window_freq,
         "window_len": config.window_len,
     }
 
 
 def test_init_respects_explicit_window_params(make_backtester):
-    params = {"window_type": "expanding", "window_freq": "D", "window_len": 5}
+    params = {"window_type": "expanding", "window_len": 5}
     assert make_backtester(window_params=params).window_params == params
 
 
@@ -202,7 +201,7 @@ def test_rolling_window_keeps_a_constant_training_length(
     make_backtester, price_data, config
 ):
     backtester = make_backtester(
-        window_params={"window_type": "rolling", "window_freq": "D", "window_len": 10}
+        window_params={"window_type": "rolling", "window_len": 10}
     )
     cutoff = int(len(price_data) * config.train_frac)
     lengths = {len(train) for train, _ in backtester._generate_folds()}
@@ -211,7 +210,7 @@ def test_rolling_window_keeps_a_constant_training_length(
 
 def test_rolling_window_rolls_the_training_start_forward(make_backtester):
     backtester = make_backtester(
-        window_params={"window_type": "rolling", "window_freq": "D", "window_len": 10}
+        window_params={"window_type": "rolling", "window_len": 10}
     )
     starts = [train.index[0] for train, _ in backtester._generate_folds()]
     assert starts == sorted(starts)
@@ -222,7 +221,7 @@ def test_expanding_window_always_starts_at_the_first_observation(
     make_backtester, price_data
 ):
     backtester = make_backtester(
-        window_params={"window_type": "expanding", "window_freq": "D", "window_len": 10}
+        window_params={"window_type": "expanding", "window_len": 10}
     )
     for train, _ in backtester._generate_folds():
         assert train.index[0] == price_data.index[0]
@@ -230,7 +229,7 @@ def test_expanding_window_always_starts_at_the_first_observation(
 
 def test_expanding_window_grows_the_training_set(make_backtester):
     backtester = make_backtester(
-        window_params={"window_type": "expanding", "window_freq": "D", "window_len": 10}
+        window_params={"window_type": "expanding", "window_len": 10}
     )
     lengths = [len(train) for train, _ in backtester._generate_folds()]
     assert lengths == sorted(lengths)
@@ -239,10 +238,10 @@ def test_expanding_window_grows_the_training_set(make_backtester):
 
 def test_both_window_types_share_the_same_test_folds(make_backtester):
     rolling = make_backtester(
-        window_params={"window_type": "rolling", "window_freq": "D", "window_len": 10}
+        window_params={"window_type": "rolling", "window_len": 10}
     )._generate_folds()
     expanding = make_backtester(
-        window_params={"window_type": "expanding", "window_freq": "D", "window_len": 10}
+        window_params={"window_type": "expanding", "window_len": 10}
     )._generate_folds()
     for (_, roll_test), (_, exp_test) in zip(rolling, expanding):
         pd.testing.assert_frame_equal(roll_test, exp_test)
@@ -250,7 +249,7 @@ def test_both_window_types_share_the_same_test_folds(make_backtester):
 
 def test_unknown_window_type_raises_value_error(make_backtester):
     backtester = make_backtester(
-        window_params={"window_type": "sliding", "window_freq": "D", "window_len": 10}
+        window_params={"window_type": "sliding", "window_len": 10}
     )
     with pytest.raises(ValueError, match="Unknown window type"):
         backtester._generate_folds()
@@ -258,10 +257,10 @@ def test_unknown_window_type_raises_value_error(make_backtester):
 
 def test_shorter_window_len_produces_more_folds(make_backtester):
     few = make_backtester(
-        window_params={"window_type": "rolling", "window_freq": "D", "window_len": 20}
+        window_params={"window_type": "rolling", "window_len": 20}
     )._generate_folds()
     many = make_backtester(
-        window_params={"window_type": "rolling", "window_freq": "D", "window_len": 5}
+        window_params={"window_type": "rolling", "window_len": 5}
     )._generate_folds()
     assert len(many) > len(few)
 
@@ -896,7 +895,6 @@ class TestRun:
         backtester = make_backtester(
             window_params={
                 "window_type": "expanding",
-                "window_freq": "D",
                 "window_len": 10,
             }
         )
@@ -911,14 +909,12 @@ class TestRun:
         rolling = make_backtester(
             window_params={
                 "window_type": "rolling",
-                "window_freq": "D",
                 "window_len": 10,
             }
         ).run(SIGNAL_ARGS, PORTFOLIO_ARGS)
         expanding = make_backtester(
             window_params={
                 "window_type": "expanding",
-                "window_freq": "D",
                 "window_len": 10,
             }
         ).run(SIGNAL_ARGS, PORTFOLIO_ARGS)

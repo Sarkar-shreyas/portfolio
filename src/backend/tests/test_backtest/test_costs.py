@@ -294,3 +294,47 @@ def test_sqrt_cost_array_defaults_to_config_bps(config, order_array, mkt_state_a
     implicit = sqrt_cost(config, order_array, mkt_state_array)
     explicit = sqrt_cost(config, order_array, mkt_state_array, cost_bps=config.cost_bps)
     assert implicit == pytest.approx(explicit)
+
+
+# ---------------------------------------------------------------------------
+# sqrt_cost() - zero and missing volume
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("volume", [0.0, -1.0, np.nan])
+def test_sqrt_cost_raises_for_a_trade_against_no_volume(config, volume):
+    with pytest.raises(ValueError, match="AAA"):
+        sqrt_cost(config, Order("AAA", 1000.0, 50.0), MktState(50.0, volume))
+
+
+@pytest.mark.parametrize("volume", [0.0, np.nan])
+def test_sqrt_cost_is_zero_for_no_trade_against_no_volume(config, volume):
+    # The backtester sends every ticker, traded or not; an untraded halted name
+    # must cost 0, not 0/0 = NaN poisoning the fold cost.
+    assert sqrt_cost(config, Order("AAA", 0.0, 50.0), MktState(50.0, volume)) == 0.0
+
+
+def test_sqrt_cost_array_names_only_the_illiquid_traded_tickers(config):
+    orders = np.array(
+        [
+            Order("AAA", 1000.0, 50.0),
+            Order("BBB", 1000.0, 50.0),
+            Order("CCC", 0.0, 50.0),
+        ]
+    )
+    states = np.array(
+        [MktState(50.0, 1_000_000.0), MktState(50.0, 0.0), MktState(50.0, 0.0)]
+    )
+    with pytest.raises(ValueError) as exc:
+        sqrt_cost(config, orders, states)
+    assert "BBB" in str(exc.value)
+    assert "AAA" not in str(exc.value)
+    assert "CCC" not in str(exc.value)
+
+
+def test_sqrt_cost_array_is_finite_when_untraded_names_have_no_volume(config):
+    orders = np.array([Order("AAA", 1000.0, 50.0), Order("BBB", 0.0, 50.0)])
+    states = np.array([MktState(50.0, 1_000_000.0), MktState(50.0, 0.0)])
+    costs = sqrt_cost(config, orders, states, cost_bps=10.0)
+    assert costs[1] == 0.0
+    assert costs[0] == pytest.approx(expected_sqrt(1000.0, 50.0, 1_000_000.0, 10.0))
