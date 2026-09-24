@@ -40,9 +40,12 @@ def pca_analysis(
     return eigval_df, eigvec_df
 
 
-def cov_shrinkage(config: DevConfig, covariances: pd.DataFrame) -> pd.DataFrame:
-    """Performs a Ledoit-Wolf shrinkage on the input covariance matrix."""
-    cov = LedoitWolf().fit(covariances)
+def cov_shrinkage(config: DevConfig, returns_data: pd.DataFrame) -> pd.DataFrame:
+    """Performs a Ledoit-Wolf shrinkage on the input returns data."""
+    returns_data = returns_data.dropna()
+    cov = LedoitWolf().fit(returns_data)
     shrunken_cov = cov.covariance_
-    shrunken_cov_df = pd.DataFrame(shrunken_cov, index=covariances.index)
+    shrunken_cov_df = pd.DataFrame(
+        shrunken_cov, index=returns_data.columns, columns=returns_data.columns
+    )
     return shrunken_cov_df
