@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 from dotenv import load_dotenv
 import os
 from pathlib import Path
@@ -28,6 +29,8 @@ class Config:
     ema_window: int = 21
     ema_short_window: int = 5
     pca_components: int = 2
+    regression_cov_type: str = "HAC"
+    hac_maxlags: Optional[int] = None
     garch_p: int = 1
     garch_q: int = 1
     garch_o: int = 0
