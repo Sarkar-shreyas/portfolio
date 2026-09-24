@@ -1,10 +1,6 @@
-from typing import Optional
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-from src.backend.config import DevConfig
+__all__ = ["plot_timeseries"]
 
 
 def plot_timeseries(data: pd.DataFrame, ax, params_dict: dict):

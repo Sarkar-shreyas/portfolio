@@ -5,7 +5,10 @@ from ibapi.common import BarData
 
 from dataclasses import dataclass
 
+__all__ = ["IBApp", "run_loop"]
 
+
+# Unused currently
 @dataclass
 class Position:
     con_id: int
@@ -18,6 +21,7 @@ class Position:
     realized_pnl: float
 
 
+# Unused currently
 @dataclass
 class Account:
     net_liquidation: float

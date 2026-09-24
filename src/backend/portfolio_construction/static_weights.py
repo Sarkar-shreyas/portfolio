@@ -4,6 +4,14 @@ from typing import Optional
 
 from src.backend.config import DevConfig
 
+__all__ = [
+    "equal_weight_benchmark",
+    "mkt_cap_weight_benchmark",
+    "turnover",
+    "avg_gross_exposure",
+    "avg_net_exposure",
+]
+
 
 def equal_weight_benchmark(
     config: DevConfig, tickers: list, tot_exposure: Optional[float] = None

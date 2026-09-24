@@ -3,6 +3,13 @@ import numpy as np
 from typing import Optional
 from src.backend.config import DevConfig
 
+__all__ = [
+    "sma_crossover",
+    "sma_crossover_portfolio",
+    "ema_crossover",
+    "ema_crossover_portfolio",
+]
+
 
 def sma_crossover(config: DevConfig, data: pd.DataFrame) -> pd.Series:
     """Generates a signal series based off SMA crossover. Assumes data columns are ['sma_short', 'sma_long']"""

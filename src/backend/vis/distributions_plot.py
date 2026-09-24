@@ -1,6 +1,7 @@
-import matplotlib.pyplot as plt
 import pandas as pd
 import statsmodels.api as sm
+
+__all__ = ["plot_qq", "plot_hist"]
 
 
 def plot_qq(data: pd.DataFrame, ax, params_dict: dict):

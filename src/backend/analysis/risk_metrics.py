@@ -10,6 +10,27 @@ from src.backend.analysis.returns import (
 )
 from src.backend.analysis.vol import ann_volatility, rolling_volatility
 
+__all__ = [
+    "get_metrics",
+    "get_correlation",
+    "rolling_correlation",
+    "get_covariance",
+    "rolling_covariance",
+    "ann_sharpe",
+    "rolling_sharpe",
+    "ann_sortino",
+    "rolling_sortino",
+    "daily_drawdowns",
+    "max_daily_drawdowns",
+    "min_drawdown",
+    "max_drawdown",
+    "rolling_drawdown",
+    "ann_calmar",
+    "probabilistic_sharpe",
+    "expected_max_sharpe",
+    "deflated_sharpe",
+]
+
 
 def _daily_rf(config: DevConfig) -> float:
     """Converts the annual risk free rate in config to a daily rate."""

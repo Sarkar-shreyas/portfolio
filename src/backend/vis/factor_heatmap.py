@@ -1,5 +1,6 @@
-import matplotlib as plt
 import pandas as pd
+
+__all__ = ["heatmap"]
 
 
 def heatmap(data: pd.DataFrame, ax, params_dict: dict):

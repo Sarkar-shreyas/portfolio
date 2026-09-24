@@ -6,6 +6,8 @@ from scipy.stats import norm, multivariate_normal
 
 from src.backend.config import DevConfig
 
+__all__ = ["mc_norm_asset_var", "mc_norm_port_var"]
+
 
 def mc_norm_asset_var(
     config: DevConfig,

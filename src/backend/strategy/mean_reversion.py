@@ -1,8 +1,9 @@
 import pandas as pd
-import numpy as np
 from typing import Optional
 
 from src.backend.config import DevConfig
+
+__all__ = ["rsi_mean_reversion"]
 
 
 def rsi_mean_reversion(
