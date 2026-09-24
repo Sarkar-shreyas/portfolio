@@ -79,7 +79,6 @@ class WalkForwardBacktester:
         if window_params is None:
             self.window_params = {
                 "window_type": config.window_type,
-                "window_freq": config.window_freq,
                 "window_len": config.window_len,
             }
         else:
@@ -140,6 +139,7 @@ class WalkForwardBacktester:
             else:
                 target_weights = weights
 
+            # Assumes the weight function returns the correct ticker index.
             target_weights = target_weights.reindex(self.price_data.columns).fillna(0.0)
 
             trade_date = test_data.index[0]

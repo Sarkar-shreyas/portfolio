@@ -17,3 +17,23 @@ def clean_timeseries(data: pd.DataFrame) -> pd.DataFrame:
     else:
         d = d.dropna()
         return d
+
+
+def to_panel(frames: dict, field: str) -> pd.DataFrame:
+    """
+    Retrieves a dictionary of dataframes keyed by their individual tickers and returns a
+    panel containing all ticker data for the specified field.
+
+    Parameters
+    ----------
+    frames: dict
+        A dictionary containing ticker : price_data key-value pairs
+    field: str
+        The data column to extract from each individual dataframe
+
+    Returns
+    -------
+    pd.DataFrame
+        A dataframe containing the 'field' column from all dataframes in 'frames'
+    """
+    return pd.concat({ticker: frame[field] for ticker, frame in frames.items()}, axis=1)
