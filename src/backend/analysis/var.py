@@ -40,7 +40,7 @@ def norm_parametric_var(
     rolling_data = data.rolling(window)
     mu = rolling_data.mean()
     sigma = rolling_data.std(ddof=1)
-    var_estimate = -norm.ppf(conf, loc=mu, scale=sigma)
+    var_estimate = norm.ppf(conf, loc=mu, scale=sigma)
     var_estimate = pd.Series(var_estimate, index=data.index)
     return var_estimate
 
@@ -58,7 +58,7 @@ def t_parametric_var(
     if window is None:
         window = config.sma_window
 
-    rescale_factor = np.sqrt(dof / (dof - 2))
+    rescale_factor = 1 / np.sqrt(dof / (dof - 2))
     rolling_data = data.rolling(window)
     mu = rolling_data.mean()
     sigma = rolling_data.std(ddof=1)

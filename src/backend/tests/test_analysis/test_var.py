@@ -82,7 +82,7 @@ def test_norm_parametric_var_matches_manual_formula(config, returns_series):
     rolling_data = returns_series.rolling(window)
     mu = rolling_data.mean()
     sigma = rolling_data.std(ddof=1)
-    expected = -norm.ppf(config.var_conf, loc=mu, scale=sigma)
+    expected = norm.ppf(config.var_conf, loc=mu, scale=sigma)
 
     np.testing.assert_allclose(result, expected, equal_nan=True)
 
@@ -116,7 +116,7 @@ def test_t_parametric_var_matches_manual_formula(config, returns_series):
     dof = 5
     result = t_parametric_var(config, returns_series, window=window, dof=dof)
 
-    rescale_factor = np.sqrt(dof / (dof - 2))
+    rescale_factor = 1 / np.sqrt(dof / (dof - 2))
     rolling_data = returns_series.rolling(window)
     mu = rolling_data.mean()
     sigma = rolling_data.std(ddof=1)
@@ -149,16 +149,20 @@ def test_t_parametric_var_leading_values_are_nan(config, returns_series):
 
 def test_est_var_skips_the_leading_nan_of_simple_returns(config, returns_series):
     with_nan = pd.concat(
-        [pd.Series([np.nan], index=[returns_series.index[0] - pd.Timedelta(days=1)]),
-         returns_series]
+        [
+            pd.Series([np.nan], index=[returns_series.index[0] - pd.Timedelta(days=1)]),
+            returns_series,
+        ]
     )
     assert est_var(config, with_nan) == est_var(config, returns_series)
 
 
 def test_cond_var_skips_the_leading_nan_of_simple_returns(config, returns_series):
     with_nan = pd.concat(
-        [pd.Series([np.nan], index=[returns_series.index[0] - pd.Timedelta(days=1)]),
-         returns_series]
+        [
+            pd.Series([np.nan], index=[returns_series.index[0] - pd.Timedelta(days=1)]),
+            returns_series,
+        ]
     )
     assert cond_var(config, with_nan) == cond_var(config, returns_series)
 
