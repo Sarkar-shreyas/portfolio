@@ -28,8 +28,7 @@ from src.backend.data import to_panel
 from src.backend.analysis import ann_returns, ann_volatility, ann_sharpe, max_drawdown, est_var
 from src.backend.strategy import sma_crossover_portfolio
 from src.backend.portfolio_construction import equal_active_weights
-from src.backend.backtest.costs import linear_cost
-from src.backend.backtest.walk_forward import WalkForwardBacktester
+from src.backend.backtest import WalkForwardBacktester, linear_cost
 
 config = DevConfig()
 
@@ -174,6 +173,48 @@ lag length is given, the Newey-West rule `floor(4 * (T / 100) ** (2 / 9))` is us
 is 4 lags for a year of daily data. Any other statsmodels `cov_type` (e.g. `"HC0"`) is
 passed through.
 
+## Value at Risk
+
+The VaR helpers use two sign conventions, so check which one you have before comparing or
+plotting them together:
+
+- `est_var` and `cond_var` are historical estimates over the whole series. They return a
+  **return quantile**, so a loss is negative (e.g. `-0.04` for a 4% one-day VaR).
+- `norm_parametric_var` and `t_parametric_var` are rolling estimates over `window` bars
+  (default `config.sma_window`). They return a **loss threshold** as a positive number,
+  indexed like the input.
+
+`t_parametric_var` scales the Student-t so that its variance matches the rolling sample
+variance. A t with scale `sigma` has variance `sigma² · dof / (dof − 2)`, so the scale is
+divided by `sqrt(dof / (dof − 2))`.
+
+Both functions take the lower-tail quantile of the fitted distribution and negate it, so the
+result is `z·sigma − mu`: a positive drift lowers the VaR.
+
+To check a rolling estimate against what actually happened, compare each day's return
+with the previous day's estimate. At 95% confidence, about 5% of days should fall below it:
+
+```python
+var = t_parametric_var(config, returns, window=63).shift(1)
+breach_rate = (returns < -var)[var.notna()].mean()
+```
+
+## Case study
+
+[`notebooks/trend_following_case_study.ipynb`](notebooks/trend_following_case_study.ipynb)
+applies the library to real IBKR data: eight technology stocks, daily bars from September
+2021 to September 2026. It has two parts:
+
+- **Portfolio risk profile.** Returns and their distribution, volatility (rolling, EWMA and
+  GARCH), drawdowns, historical, Monte Carlo and parametric VaR/CVaR with a breach test,
+  CAPM beta, and Fama-French five-factor exposures for the portfolio and each stock.
+- **Strategy backtest.** A walk-forward SMA crossover against SPX and against a long-only
+  book run through the same backtester and cost model. It also covers sensitivity to
+  transaction costs and a deflated Sharpe ratio across a grid of 14 window pairs.
+
+It runs from the cached data in `src/backend/cache/`, so no IBKR connection is needed
+once that is populated. The notebook's summary and conclusions sections have the findings.
+
 ## Contracts
 
 The backtester defines the shape every pluggable piece has to satisfy. The three
@@ -218,6 +259,7 @@ A few invariants matter enough to state explicitly:
 | `src/backend/simulations/` | Monte Carlo VaR (single asset and portfolio), additive/multiplicative random walks, GBM |
 | `src/backend/vis/` | backtest run charts (equity curve, drawdown, rolling Sharpe, three-panel summary), candlestick, timeseries, histogram, QQ and heatmap helpers |
 | `src/backend/tests/` | the test suite, mirroring the package layout |
+| `notebooks/` | worked examples; currently the trend-following case study |
 
 Every analysis function takes a config instance as its first argument and reads its
 defaults from it, so behaviour is changed by editing `config.py` or passing an override
