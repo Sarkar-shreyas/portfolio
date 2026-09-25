@@ -82,7 +82,7 @@ def test_norm_parametric_var_matches_manual_formula(config, returns_series):
     rolling_data = returns_series.rolling(window)
     mu = rolling_data.mean()
     sigma = rolling_data.std(ddof=1)
-    expected = norm.ppf(config.var_conf, loc=mu, scale=sigma)
+    expected = -norm.ppf(1 - config.var_conf, loc=mu, scale=sigma)
 
     np.testing.assert_allclose(result, expected, equal_nan=True)
 
